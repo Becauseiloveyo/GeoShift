@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -142,9 +143,8 @@ fun GeoShiftAppScreen(
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                 Destination.entries.forEach { destination ->
-                    val selected = state.destination == destination
                     NavigationBarItem(
-                        selected = selected,
+                        selected = state.destination == destination,
                         onClick = { actions.navigate(destination) },
                         icon = {
                             Icon(
@@ -604,6 +604,8 @@ private fun ProfileEditor(
     onExport: (GeoProfile) -> Unit,
 ) {
     var draft by remember(profile) { mutableStateOf(profile) }
+    var latitudeText by remember(profile) { mutableStateOf(profile.latitude.toString()) }
+    var longitudeText by remember(profile) { mutableStateOf(profile.longitude.toString()) }
     var showAppPicker by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     val issues = remember(draft) { ProfileDiagnostics.evaluate(draft) }
@@ -708,16 +710,22 @@ private fun ProfileEditor(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(
-                            value = if (draft.latitude.isNaN()) "" else draft.latitude.toString(),
-                            onValueChange = { draft = draft.copy(latitude = it.toDoubleOrNull() ?: Double.NaN) },
+                            value = latitudeText,
+                            onValueChange = {
+                                latitudeText = it
+                                draft = draft.copy(latitude = it.toDoubleOrNull() ?: Double.NaN)
+                            },
                             label = { Text("Latitude") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                         )
                         OutlinedTextField(
-                            value = if (draft.longitude.isNaN()) "" else draft.longitude.toString(),
-                            onValueChange = { draft = draft.copy(longitude = it.toDoubleOrNull() ?: Double.NaN) },
+                            value = longitudeText,
+                            onValueChange = {
+                                longitudeText = it
+                                draft = draft.copy(longitude = it.toDoubleOrNull() ?: Double.NaN)
+                            },
                             label = { Text("Longitude") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -847,7 +855,7 @@ private fun AppPickerSheet(
 private fun SectionCard(
     title: String,
     icon: (@Composable () -> Unit)? = null,
-    content: @Composable Column.() -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
