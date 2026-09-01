@@ -5,9 +5,7 @@ import io.github.libxposed.service.XposedService
 
 /**
  * Multi-profile storage layered on the same Remote Preferences file used by v0.1.
- *
- * Package names are used as stable namespaces. Legacy single-profile keys are kept
- * readable so existing installs can migrate without losing their configuration.
+ * Package names are stable namespaces; new fields default safely for old installs.
  */
 object ProfileStoreV2 {
     const val REMOTE_PREFS = ProfileStore.REMOTE_PREFS
@@ -17,7 +15,6 @@ object ProfileStoreV2 {
     private const val SEPARATOR = "|"
 
     private fun key(packageName: String, field: String) = "$PREFIX$packageName::$field"
-
     fun prefixFor(packageName: String): String = "$PREFIX$packageName::"
 
     fun list(service: XposedService): List<GeoProfile> {
@@ -42,7 +39,6 @@ object ProfileStoreV2 {
         if (packageName.isBlank()) return null
         val storedTarget = prefs.getString(key(packageName, ProfileStore.KEY_TARGET_PACKAGE), null)
         if (storedTarget == null) {
-            // Compatibility path for users upgrading from the original single-profile format.
             val legacyTarget = prefs.getString(ProfileStore.KEY_TARGET_PACKAGE, "").orEmpty()
             return if (legacyTarget == packageName) ProfileStore.load(prefs) else null
         }
@@ -58,6 +54,15 @@ object ProfileStoreV2 {
             locationEnabled = prefs.getBoolean(key(packageName, ProfileStore.KEY_LOCATION_ENABLED), true),
             latitude = prefs.getString(key(packageName, ProfileStore.KEY_LATITUDE), "0.0")?.toDoubleOrNull() ?: 0.0,
             longitude = prefs.getString(key(packageName, ProfileStore.KEY_LONGITUDE), "0.0")?.toDoubleOrNull() ?: 0.0,
+            geocoderEnabled = prefs.getBoolean(key(packageName, ProfileStore.KEY_GEOCODER_ENABLED), true),
+            wifiEnabled = prefs.getBoolean(key(packageName, ProfileStore.KEY_WIFI_ENABLED), false),
+            wifiSsid = prefs.getString(key(packageName, ProfileStore.KEY_WIFI_SSID), "").orEmpty(),
+            wifiBssid = prefs.getString(key(packageName, ProfileStore.KEY_WIFI_BSSID), "").orEmpty(),
+            telephonyEnabled = prefs.getBoolean(key(packageName, ProfileStore.KEY_TELEPHONY_ENABLED), false),
+            mcc = prefs.getString(key(packageName, ProfileStore.KEY_MCC), "").orEmpty(),
+            mnc = prefs.getString(key(packageName, ProfileStore.KEY_MNC), "").orEmpty(),
+            operatorName = prefs.getString(key(packageName, ProfileStore.KEY_OPERATOR_NAME), "").orEmpty(),
+            radioSource = prefs.getString(key(packageName, ProfileStore.KEY_RADIO_SOURCE), "").orEmpty(),
             lastSyncIp = prefs.getString(key(packageName, ProfileStore.KEY_LAST_SYNC_IP), "").orEmpty(),
             lastSyncCity = prefs.getString(key(packageName, ProfileStore.KEY_LAST_SYNC_CITY), "").orEmpty(),
             lastSyncRegion = prefs.getString(key(packageName, ProfileStore.KEY_LAST_SYNC_REGION), "").orEmpty(),
@@ -90,6 +95,15 @@ object ProfileStoreV2 {
             .putBoolean(key(packageName, ProfileStore.KEY_LOCATION_ENABLED), profile.locationEnabled)
             .putString(key(packageName, ProfileStore.KEY_LATITUDE), profile.latitude.toString())
             .putString(key(packageName, ProfileStore.KEY_LONGITUDE), profile.longitude.toString())
+            .putBoolean(key(packageName, ProfileStore.KEY_GEOCODER_ENABLED), profile.geocoderEnabled)
+            .putBoolean(key(packageName, ProfileStore.KEY_WIFI_ENABLED), profile.wifiEnabled)
+            .putString(key(packageName, ProfileStore.KEY_WIFI_SSID), profile.wifiSsid)
+            .putString(key(packageName, ProfileStore.KEY_WIFI_BSSID), profile.wifiBssid.lowercase())
+            .putBoolean(key(packageName, ProfileStore.KEY_TELEPHONY_ENABLED), profile.telephonyEnabled)
+            .putString(key(packageName, ProfileStore.KEY_MCC), profile.mcc)
+            .putString(key(packageName, ProfileStore.KEY_MNC), profile.mnc)
+            .putString(key(packageName, ProfileStore.KEY_OPERATOR_NAME), profile.operatorName)
+            .putString(key(packageName, ProfileStore.KEY_RADIO_SOURCE), profile.radioSource)
             .putString(key(packageName, ProfileStore.KEY_LAST_SYNC_IP), profile.lastSyncIp)
             .putString(key(packageName, ProfileStore.KEY_LAST_SYNC_CITY), profile.lastSyncCity)
             .putString(key(packageName, ProfileStore.KEY_LAST_SYNC_REGION), profile.lastSyncRegion)
@@ -107,6 +121,10 @@ object ProfileStoreV2 {
             ProfileStore.KEY_TIMEZONE_ENABLED, ProfileStore.KEY_TIMEZONE,
             ProfileStore.KEY_LOCALE_ENABLED, ProfileStore.KEY_LOCALE, ProfileStore.KEY_COUNTRY,
             ProfileStore.KEY_LOCATION_ENABLED, ProfileStore.KEY_LATITUDE, ProfileStore.KEY_LONGITUDE,
+            ProfileStore.KEY_GEOCODER_ENABLED,
+            ProfileStore.KEY_WIFI_ENABLED, ProfileStore.KEY_WIFI_SSID, ProfileStore.KEY_WIFI_BSSID,
+            ProfileStore.KEY_TELEPHONY_ENABLED, ProfileStore.KEY_MCC, ProfileStore.KEY_MNC,
+            ProfileStore.KEY_OPERATOR_NAME, ProfileStore.KEY_RADIO_SOURCE,
             ProfileStore.KEY_LAST_SYNC_IP, ProfileStore.KEY_LAST_SYNC_CITY,
             ProfileStore.KEY_LAST_SYNC_REGION, ProfileStore.KEY_LAST_SYNC_AT,
         )
