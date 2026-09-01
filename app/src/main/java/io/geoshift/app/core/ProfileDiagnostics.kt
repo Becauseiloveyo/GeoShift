@@ -27,7 +27,7 @@ object ProfileDiagnostics {
             add(Issue(Severity.WARNING, "Geocoder override is enabled while location override is disabled"))
         }
 
-        if (profile.wifiEnabled && profile.wifiSsid.isBlank() && profile.wifiBssid.isBlank()) {
+        if (profile.wifiEnabled && profile.effectiveWifiAccessPoints().isEmpty()) {
             add(Issue(Severity.WARNING, "Wi-Fi override is enabled but no SSID/BSSID is configured"))
         }
 
