@@ -3,7 +3,7 @@ package io.geoshift.app.core
 import org.json.JSONObject
 
 object ProfileCodec {
-    private const val SCHEMA_VERSION = 1
+    private const val SCHEMA_VERSION = 2
 
     fun encode(profile: GeoProfile): String = JSONObject().apply {
         put("schemaVersion", SCHEMA_VERSION)
@@ -19,6 +19,15 @@ object ProfileCodec {
             put("locationEnabled", profile.locationEnabled)
             put("latitude", profile.latitude)
             put("longitude", profile.longitude)
+            put("geocoderEnabled", profile.geocoderEnabled)
+            put("wifiEnabled", profile.wifiEnabled)
+            put("wifiSsid", profile.wifiSsid)
+            put("wifiBssid", profile.wifiBssid)
+            put("telephonyEnabled", profile.telephonyEnabled)
+            put("mcc", profile.mcc)
+            put("mnc", profile.mnc)
+            put("operatorName", profile.operatorName)
+            put("radioSource", profile.radioSource)
             put("lastSyncIp", profile.lastSyncIp)
             put("lastSyncCity", profile.lastSyncCity)
             put("lastSyncRegion", profile.lastSyncRegion)
@@ -29,7 +38,7 @@ object ProfileCodec {
     fun decode(text: String): GeoProfile {
         val root = JSONObject(text)
         val version = root.optInt("schemaVersion", 1)
-        require(version == SCHEMA_VERSION) { "Unsupported GeoShift profile schema: $version" }
+        require(version in 1..SCHEMA_VERSION) { "Unsupported GeoShift profile schema: $version" }
         val json = root.optJSONObject("profile") ?: root
         return GeoProfile(
             enabled = json.optBoolean("enabled", true),
@@ -43,6 +52,15 @@ object ProfileCodec {
             locationEnabled = json.optBoolean("locationEnabled", true),
             latitude = json.optDouble("latitude", 0.0),
             longitude = json.optDouble("longitude", 0.0),
+            geocoderEnabled = json.optBoolean("geocoderEnabled", true),
+            wifiEnabled = json.optBoolean("wifiEnabled", false),
+            wifiSsid = json.optString("wifiSsid", ""),
+            wifiBssid = json.optString("wifiBssid", ""),
+            telephonyEnabled = json.optBoolean("telephonyEnabled", false),
+            mcc = json.optString("mcc", ""),
+            mnc = json.optString("mnc", ""),
+            operatorName = json.optString("operatorName", ""),
+            radioSource = json.optString("radioSource", ""),
             lastSyncIp = json.optString("lastSyncIp", ""),
             lastSyncCity = json.optString("lastSyncCity", ""),
             lastSyncRegion = json.optString("lastSyncRegion", ""),
