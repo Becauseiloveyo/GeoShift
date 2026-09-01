@@ -8,8 +8,16 @@ class GeoProfileSynchronizer(
 ) {
     data class Outcome(val profile: GeoProfile, val geoIp: GeoIpResult)
 
-    fun synchronize(base: GeoProfile, nowEpochMs: Long = System.currentTimeMillis()): Outcome {
-        val result = geoIpProvider.lookupCurrentExit()
+    fun resolveCurrentExit(): GeoIpResult = geoIpProvider.lookupCurrentExit()
+
+    fun synchronize(base: GeoProfile, nowEpochMs: Long = System.currentTimeMillis()): Outcome =
+        synchronize(base, resolveCurrentExit(), nowEpochMs)
+
+    fun synchronize(
+        base: GeoProfile,
+        result: GeoIpResult,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): Outcome {
         val country = result.countryCode.uppercase()
         val updated = base.copy(
             timezoneId = result.timezoneId.ifBlank { base.timezoneId },
