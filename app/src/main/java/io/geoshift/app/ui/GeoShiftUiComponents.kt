@@ -190,4 +190,4 @@ internal fun AppIcon(packageName: String, label: String) {
 
 internal fun appLabel(packageName: String, apps: List<AppChoice>): String =
     apps.firstOrNull { it.packageName == packageName }?.label
-        ?: packageName.substringAfterLast('.').replaceFirstChar { it.uppercase() }.ifBlank { "New app" }
+        ?: packageName.substringAfterLast('.').replaceFirstChar { it.uppercase() }.ifBlank { packageName }
