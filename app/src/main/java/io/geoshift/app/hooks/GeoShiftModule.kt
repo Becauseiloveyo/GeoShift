@@ -68,12 +68,12 @@ class GeoShiftModule : XposedModule() {
             hook(getLatitude).intercept { chain ->
                 val current = profile.get()
                 if (!current.isLocationActive() || current!!.latitude !in -90.0..90.0) chain.proceed()
-                else current.latitude
+                else current!!.latitude
             }
             hook(getLongitude).intercept { chain ->
                 val current = profile.get()
                 if (!current.isLocationActive() || current!!.longitude !in -180.0..180.0) chain.proceed()
-                else current.longitude
+                else current!!.longitude
             }
         }.onFailure { log(Log.WARN, TAG, "Location hook failed", it) }
     }
