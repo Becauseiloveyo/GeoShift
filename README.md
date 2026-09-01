@@ -1,45 +1,73 @@
 # GeoShift
 
-GeoShift is an Android environment-profile tool for privacy, development, and location/region compatibility testing on rooted devices with LSPosed.
+GeoShift is a free Android/LSPosed environment-profile tool for privacy, development, and location/region compatibility testing on devices you control.
 
-## Goals
+## v0.1 foundation
 
-- Per-app environment profiles
-- Manual and VPN-following geographic profiles
-- Time zone, locale, country, location and geocoder overrides
-- Extensible providers for Wi-Fi and cellular test data
-- Consistency checks so one profile remains internally coherent
-- Clear separation between stable device identity and changing geographic state
+The first implementation uses the Modern Xposed API 102 and keeps one coherent per-app geographic profile.
+
+### Implemented
+
+- Dynamic LSPosed scope request for a target package
+- Remote Preferences shared between manager app and hooked process
+- Manual profile editing
+- VPN transport detection
+- Public exit-IP GeoIP synchronization
+- Automatic country, time zone and approximate coordinates from the current exit IP
+- Per-app `TimeZone.getDefault()` override
+- Per-app `Locale.getDefault()` override
+- Per-app latitude/longitude override for Android `Location` objects
+- Wi-Fi/cellular environment provider interfaces for later database-backed implementations
+- Android CI workflow
+
+### Follow VPN flow
+
+```text
+VPN/network changes
+    -> detect active VPN transport
+    -> resolve public exit IP
+    -> GeoIP (country/city/time zone/coordinates)
+    -> save GeoProfile
+    -> target app reads updated Remote Preferences
+```
+
+The current automatic listener runs while the GeoShift manager is open. Persistent background synchronization is a later milestone.
+
+## Build
+
+Requirements:
+
+- JDK 17
+- Android SDK 36
+- Gradle 8.13
+
+```bash
+gradle :app:assembleDebug
+```
+
+The project uses Android Gradle Plugin 8.13.2, Kotlin 2.3.21, `io.github.libxposed:api:102.0.0`, and `io.github.libxposed:service:102.0.0`.
+
+## Next milestones
+
+- [x] Android application skeleton
+- [x] Profile model and validation
+- [x] VPN network detection
+- [x] Replaceable GeoIP provider
+- [x] Time zone / locale hooks
+- [x] Basic location hook
+- [x] Wi-Fi / cellular provider interfaces
+- [ ] Persistent VPN-follow background service
+- [ ] Geocoder/address profile
+- [ ] Database-backed nearby Wi-Fi provider
+- [ ] Database-backed nearby cellular provider
+- [ ] Profile import/export
+- [ ] Automated consistency diagnostics
+- [ ] Test matrix for Android 14/15/16
 
 ## Scope
 
-GeoShift is intended for testing, privacy, and compatibility work on devices you control. It does not attempt to bypass hardware-backed attestation, Play Integrity, financial-service controls, anti-cheat systems, or server-side account risk systems.
+GeoShift does not attempt to bypass hardware-backed attestation, Play Integrity, financial-service controls, anti-cheat systems, or server-side account risk systems.
 
-## Planned architecture
+## Licensing
 
-```text
-app/
-  UI + profile management
-core/
-  profile model + validation
-hooks/
-  LSPosed entry point + hook providers
-network/
-  VPN detection + GeoIP abstraction
-```
-
-## Initial milestones
-
-- [x] Repository bootstrap
-- [ ] Android application skeleton
-- [ ] Profile data model
-- [ ] VPN network detection
-- [ ] GeoIP provider interface
-- [ ] Time zone / locale hook providers
-- [ ] Location test provider
-- [ ] Consistency validator
-- [ ] Wi-Fi / cellular data provider interfaces
-
-## License
-
-To be decided before importing or adapting code from third-party projects. Any reused code must preserve its original license obligations.
+No source code from paid applications has been copied into GeoShift. Before adapting code from GPL/AGPL projects, GeoShift will adopt a compatible project license and preserve upstream attribution and source obligations.
