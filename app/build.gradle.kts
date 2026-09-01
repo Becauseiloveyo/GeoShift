@@ -27,16 +27,16 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlin {
-        jvmToolchain(17)
-    }
-
     packaging {
         resources {
             merges += "META-INF/xposed/*"
             excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1")
         }
     }
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 dependencies {
