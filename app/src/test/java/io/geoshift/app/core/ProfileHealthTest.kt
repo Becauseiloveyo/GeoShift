@@ -49,6 +49,31 @@ class ProfileHealthTest {
     }
 
     @Test
+    fun providerOnlyAccessPointListCountsAsConfiguredWifi() {
+        val profile = GeoProfile(
+            targetPackage = "com.example.app",
+            wifiEnabled = true,
+            wifiSsid = "",
+            wifiBssid = "",
+            wifiAccessPoints = listOf(
+                WifiAccessPointProfile("Provider AP", "aa:bb:cc:dd:ee:10", -51, 5180),
+                WifiAccessPointProfile("Provider AP 2", "aa:bb:cc:dd:ee:11", -63, 2412),
+            ),
+            radioSource = "WiGLE",
+            locationEnabled = false,
+            geocoderEnabled = false,
+            timezoneEnabled = false,
+            localeEnabled = false,
+        )
+
+        val report = ProfileHealth.evaluate(profile)
+
+        assertTrue(report.wifiReady)
+        assertEquals(2, report.wifiAccessPointCount)
+        assertFalse(report.issues.any { it.message == "Wi-Fi override is enabled but no SSID/BSSID is configured" })
+    }
+
+    @Test
     fun emptyEnabledWifiEnvironmentReducesReadiness() {
         val profile = GeoProfile(
             targetPackage = "com.example.app",
