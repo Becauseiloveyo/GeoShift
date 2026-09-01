@@ -35,14 +35,14 @@ class VpnFollowService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        promoteToForeground("Starting VPN-follow synchronization")
+        promoteToForeground(getString(R.string.notif_starting))
         GeoShiftApp.addServiceListener(xposedListener)
         networkCallback = detector.register { state ->
             if (state.active) {
-                updateNotification("VPN detected; checking exit IP")
+                updateNotification(getString(R.string.notif_vpn_detected))
                 scheduleSync()
             } else {
-                updateNotification("Waiting for an active VPN")
+                updateNotification(getString(R.string.notif_waiting_vpn))
             }
         }
     }
@@ -70,7 +70,7 @@ class VpnFollowService : Service() {
 
     private fun syncNow() {
         val service = GeoShiftApp.service ?: run {
-            updateNotification("Waiting for LSPosed service")
+            updateNotification(getString(R.string.notif_waiting_lsposed))
             return
         }
         val profiles = ProfileStoreV2.list(service).filter { it.enabled && it.followVpn }
@@ -79,15 +79,13 @@ class VpnFollowService : Service() {
             return
         }
         if (!detector.currentState().active) {
-            updateNotification("Waiting for an active VPN")
+            updateNotification(getString(R.string.notif_waiting_vpn))
             return
         }
         if (!syncing.compareAndSet(false, true)) return
 
         executor.execute {
             try {
-                // Resolve the public exit exactly once so every followed app receives
-                // one coherent geographic snapshot for this network transition.
                 val geoIp = synchronizer.resolveCurrentExit()
                 val now = System.currentTimeMillis()
                 var saved = 0
@@ -99,9 +97,9 @@ class VpnFollowService : Service() {
                 val place = listOf(geoIp.city, geoIp.countryCode)
                     .filter { it.isNotBlank() }
                     .joinToString(", ")
-                updateNotification("Synced $saved/${profiles.size} profiles · ${geoIp.ip} · $place")
+                updateNotification(getString(R.string.notif_synced, saved, profiles.size, geoIp.ip, place))
             } catch (error: Throwable) {
-                updateNotification("GeoIP sync failed: ${error.message ?: error.javaClass.simpleName}")
+                updateNotification(getString(R.string.notif_geoip_failed, error.message ?: error.javaClass.simpleName))
             } finally {
                 syncing.set(false)
             }
@@ -111,8 +109,12 @@ class VpnFollowService : Service() {
     private fun createNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "GeoShift VPN follow", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Shows status while GeoShift follows the active VPN exit location"
+            NotificationChannel(
+                CHANNEL_ID,
+                getString(R.string.notif_channel_name),
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = getString(R.string.notif_channel_desc)
                 setShowBadge(false)
             }
         )
@@ -132,8 +134,8 @@ class VpnFollowService : Service() {
     }
 
     private fun buildNotification(status: String): Notification = Notification.Builder(this, CHANNEL_ID)
-        .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-        .setContentTitle("GeoShift · Follow VPN")
+        .setSmallIcon(R.drawable.ic_launcher_monochrome)
+        .setContentTitle(getString(R.string.notif_title))
         .setContentText(status)
         .setOngoing(true)
         .setOnlyAlertOnce(true)
