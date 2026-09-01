@@ -21,10 +21,14 @@ object ProfileStore {
     const val KEY_WIFI_ENABLED = "wifi_enabled"
     const val KEY_WIFI_SSID = "wifi_ssid"
     const val KEY_WIFI_BSSID = "wifi_bssid"
+    const val KEY_WIFI_RSSI = "wifi_rssi_dbm"
     const val KEY_TELEPHONY_ENABLED = "telephony_enabled"
     const val KEY_MCC = "mcc"
     const val KEY_MNC = "mnc"
     const val KEY_OPERATOR_NAME = "operator_name"
+    const val KEY_CELL_RADIO = "cell_radio"
+    const val KEY_CELL_AREA_CODE = "cell_area_code"
+    const val KEY_CELL_ID = "cell_id"
     const val KEY_RADIO_SOURCE = "radio_source"
     const val KEY_LAST_SYNC_IP = "last_sync_ip"
     const val KEY_LAST_SYNC_CITY = "last_sync_city"
@@ -49,10 +53,14 @@ object ProfileStore {
         wifiEnabled = prefs.getBoolean(KEY_WIFI_ENABLED, false),
         wifiSsid = prefs.getString(KEY_WIFI_SSID, "").orEmpty(),
         wifiBssid = prefs.getString(KEY_WIFI_BSSID, "").orEmpty(),
+        wifiRssiDbm = prefs.getInt(KEY_WIFI_RSSI, -45),
         telephonyEnabled = prefs.getBoolean(KEY_TELEPHONY_ENABLED, false),
         mcc = prefs.getString(KEY_MCC, "").orEmpty(),
         mnc = prefs.getString(KEY_MNC, "").orEmpty(),
         operatorName = prefs.getString(KEY_OPERATOR_NAME, "").orEmpty(),
+        cellRadio = prefs.getString(KEY_CELL_RADIO, "").orEmpty(),
+        cellAreaCode = prefs.getLong(KEY_CELL_AREA_CODE, -1L),
+        cellId = prefs.getLong(KEY_CELL_ID, -1L),
         radioSource = prefs.getString(KEY_RADIO_SOURCE, "").orEmpty(),
         lastSyncIp = prefs.getString(KEY_LAST_SYNC_IP, "").orEmpty(),
         lastSyncCity = prefs.getString(KEY_LAST_SYNC_CITY, "").orEmpty(),
@@ -78,10 +86,14 @@ object ProfileStore {
             .putBoolean(KEY_WIFI_ENABLED, profile.wifiEnabled)
             .putString(KEY_WIFI_SSID, profile.wifiSsid)
             .putString(KEY_WIFI_BSSID, profile.wifiBssid.lowercase())
+            .putInt(KEY_WIFI_RSSI, profile.wifiRssiDbm)
             .putBoolean(KEY_TELEPHONY_ENABLED, profile.telephonyEnabled)
             .putString(KEY_MCC, profile.mcc)
             .putString(KEY_MNC, profile.mnc)
             .putString(KEY_OPERATOR_NAME, profile.operatorName)
+            .putString(KEY_CELL_RADIO, profile.cellRadio)
+            .putLong(KEY_CELL_AREA_CODE, profile.cellAreaCode)
+            .putLong(KEY_CELL_ID, profile.cellId)
             .putString(KEY_RADIO_SOURCE, profile.radioSource)
             .putString(KEY_LAST_SYNC_IP, profile.lastSyncIp)
             .putString(KEY_LAST_SYNC_CITY, profile.lastSyncCity)
