@@ -52,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -61,10 +62,10 @@ import io.geoshift.app.R
 import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.ProviderSettings
 
-private enum class ProfileSort(val label: String) {
-    Recent("Recent"),
-    Name("Name"),
-    Enabled("Enabled"),
+private enum class ProfileSort(val labelRes: Int) {
+    Recent(R.string.sort_recent),
+    Name(R.string.sort_name),
+    Enabled(R.string.sort_enabled),
 }
 
 @Composable
@@ -169,10 +170,11 @@ private fun destinationIcon(destination: Destination): Int = when (destination) 
     Destination.Providers -> R.drawable.ms_settings_24
 }
 
+@Composable
 private fun destinationLabel(destination: Destination): String = when (destination) {
-    Destination.Overview -> "Overview"
-    Destination.Profiles -> "Profiles"
-    Destination.Providers -> "Providers"
+    Destination.Overview -> stringResource(R.string.nav_overview)
+    Destination.Profiles -> stringResource(R.string.nav_profiles)
+    Destination.Providers -> stringResource(R.string.nav_providers)
 }
 
 @Composable
@@ -193,10 +195,10 @@ private fun OverviewScreen(
         ) {
             item {
                 Column {
-                    Text("GeoShift", style = MaterialTheme.typography.headlineLarge)
+                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "One coherent geographic profile for each app.",
+                        stringResource(R.string.tagline),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -205,8 +207,8 @@ private fun OverviewScreen(
             item { StatusHero(state, latest, actions.syncAll) }
             item {
                 SectionTitle(
-                    title = "Profiles",
-                    action = if (state.profiles.isEmpty()) "Add" else "View all",
+                    title = stringResource(R.string.nav_profiles),
+                    action = if (state.profiles.isEmpty()) stringResource(R.string.action_add) else stringResource(R.string.action_view_all),
                     onAction = {
                         if (state.profiles.isEmpty()) actions.addProfile()
                         else actions.navigate(Destination.Profiles)
@@ -263,19 +265,22 @@ private fun StatusHero(state: GeoShiftUiState, latest: GeoProfile?, onSync: () -
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("VPN-aware environment", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.vpn_environment), style = MaterialTheme.typography.titleLarge)
                     Text(
-                        if (place.isBlank()) "Ready for the first exit-IP sync" else place,
+                        if (place.isBlank()) stringResource(R.string.ready_first_sync) else place,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
-                StatusBadge(if (state.vpnActive) "VPN active" else "No VPN", state.vpnActive)
+                StatusBadge(
+                    if (state.vpnActive) stringResource(R.string.vpn_active) else stringResource(R.string.no_vpn),
+                    state.vpnActive,
+                )
             }
 
             if (latest?.lastSyncIp?.isNotBlank() == true) {
                 Text(
-                    "Exit ${latest.lastSyncIp} · ${latest.timezoneId}",
+                    stringResource(R.string.exit_format, latest.lastSyncIp, latest.timezoneId),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                 )
@@ -285,16 +290,18 @@ private fun StatusHero(state: GeoShiftUiState, latest: GeoProfile?, onSync: () -
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                MiniStatus("LSPosed", state.serviceConnected)
-                MiniStatus("Profiles", state.profiles.isNotEmpty(), state.profiles.size.toString())
-                MiniStatus("Radio", radioProfiles > 0, radioProfiles.toString())
+                MiniStatus(stringResource(R.string.status_lsposed), state.serviceConnected)
+                MiniStatus(stringResource(R.string.status_profiles), state.profiles.isNotEmpty(), state.profiles.size.toString())
+                MiniStatus(stringResource(R.string.status_radio), radioProfiles > 0, radioProfiles.toString())
             }
 
             FilledTonalButton(
                 onClick = onSync,
                 enabled = state.serviceConnected && !state.isSyncing,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (state.isSyncing) "Synchronizing…" else "Sync followed profiles") }
+            ) {
+                Text(if (state.isSyncing) stringResource(R.string.synchronizing) else stringResource(R.string.sync_followed_profiles))
+            }
 
             Row(verticalAlignment = Alignment.Top) {
                 Symbol(
@@ -304,7 +311,7 @@ private fun StatusHero(state: GeoShiftUiState, latest: GeoProfile?, onSync: () -
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Exit IP is verified from GeoShift itself. Split-tunnel routing for each target app is not independently verified yet.",
+                    stringResource(R.string.split_tunnel_warning),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
@@ -343,15 +350,15 @@ private fun EmptyProfilesCard(onAdd: () -> Unit, onImport: () -> Unit) {
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Symbol(R.drawable.ms_apps_24, modifier = Modifier.size(30.dp))
-            Text("No app profiles yet", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.no_profiles_title), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Create one profile per target app. GeoShift can keep location, address, time zone, locale and radio identity coherent.",
+                stringResource(R.string.no_profiles_desc),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onAdd) { Text("Create profile") }
-                TextButton(onClick = onImport) { Text("Import JSON") }
+                Button(onClick = onAdd) { Text(stringResource(R.string.create_profile)) }
+                TextButton(onClick = onImport) { Text(stringResource(R.string.import_json)) }
             }
         }
     }
@@ -393,15 +400,15 @@ private fun ProfilesScreen(
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Profiles", style = MaterialTheme.typography.headlineLarge)
+                        Text(stringResource(R.string.nav_profiles), style = MaterialTheme.typography.headlineLarge)
                         Text(
-                            "Independent app environments sharing one verified VPN exit when Follow VPN is enabled.",
+                            stringResource(R.string.profiles_desc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     IconButton(onClick = actions.addProfile) {
-                        Symbol(R.drawable.ms_add_24, contentDescription = "Add profile")
+                        Symbol(R.drawable.ms_add_24, contentDescription = stringResource(R.string.add_profile_cd))
                     }
                 }
             }
@@ -414,8 +421,10 @@ private fun ProfilesScreen(
                         value = query,
                         onValueChange = { query = it },
                         leadingIcon = { Symbol(R.drawable.ms_search_24) },
-                        placeholder = { Text("Search profiles") },
-                        supportingText = { Text("${visibleProfiles.size} of ${state.profiles.size} profiles") },
+                        placeholder = { Text(stringResource(R.string.search_profiles)) },
+                        supportingText = {
+                            Text(stringResource(R.string.profile_count_format, visibleProfiles.size, state.profiles.size))
+                        },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -429,7 +438,7 @@ private fun ProfilesScreen(
                             FilterChip(
                                 selected = selectedSort == mode,
                                 onClick = { sortMode = mode.name },
-                                label = { Text(mode.label) },
+                                label = { Text(stringResource(mode.labelRes)) },
                             )
                         }
                     }
@@ -442,9 +451,9 @@ private fun ProfilesScreen(
                                 modifier = Modifier.fillMaxWidth().padding(20.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                Text("No matching profiles", style = MaterialTheme.typography.titleMedium)
+                                Text(stringResource(R.string.no_matching_profiles), style = MaterialTheme.typography.titleMedium)
                                 Text(
-                                    "Try an app name, package, country, time zone, Wi-Fi name or operator.",
+                                    stringResource(R.string.no_matching_profiles_desc),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -464,7 +473,7 @@ private fun ProfilesScreen(
 
                 item {
                     OutlinedButton(onClick = actions.importProfile, modifier = Modifier.fillMaxWidth()) {
-                        Text("Import profile JSON")
+                        Text(stringResource(R.string.import_profile_json))
                     }
                 }
             }
@@ -511,15 +520,15 @@ private fun ProfileCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (profile.followVpn) FeatureTag("VPN")
+                if (profile.followVpn) FeatureTag(stringResource(R.string.tag_vpn))
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (profile.locationEnabled) FeatureTag("GPS")
-                if (profile.geocoderEnabled) FeatureTag("Address")
-                if (profile.timezoneEnabled) FeatureTag("Time zone")
-                if (profile.localeEnabled) FeatureTag("Locale")
-                if (profile.wifiEnabled) FeatureTag("Wi-Fi")
-                if (profile.telephonyEnabled) FeatureTag("Cell")
+                if (profile.locationEnabled) FeatureTag(stringResource(R.string.tag_gps))
+                if (profile.geocoderEnabled) FeatureTag(stringResource(R.string.tag_address))
+                if (profile.timezoneEnabled) FeatureTag(stringResource(R.string.tag_timezone))
+                if (profile.localeEnabled) FeatureTag(stringResource(R.string.tag_locale))
+                if (profile.wifiEnabled) FeatureTag(stringResource(R.string.tag_wifi))
+                if (profile.telephonyEnabled) FeatureTag(stringResource(R.string.tag_cell))
             }
         }
     }
@@ -542,13 +551,16 @@ private fun ProviderSummaryCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Symbol(R.drawable.ms_wifi_24)
                 Spacer(Modifier.width(10.dp))
-                Text("Radio identity data", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                StatusBadge(if (wifi || cells) "Configured" else "Optional", wifi || cells)
+                Text(stringResource(R.string.radio_identity_data), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                StatusBadge(
+                    if (wifi || cells) stringResource(R.string.configured) else stringResource(R.string.optional),
+                    wifi || cells,
+                )
             }
             Text(radioStatus, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                FeatureTag(if (wifi) "WiGLE ready" else "WiGLE off")
-                FeatureTag(if (cells) "OpenCellID ready" else "OpenCellID off")
+                FeatureTag(if (wifi) stringResource(R.string.wigle_ready) else stringResource(R.string.wigle_off))
+                FeatureTag(if (cells) stringResource(R.string.opencellid_ready) else stringResource(R.string.opencellid_off))
             }
         }
     }
@@ -573,25 +585,25 @@ private fun ProvidersScreen(
         ) {
             item {
                 Column {
-                    Text("Providers", style = MaterialTheme.typography.headlineLarge)
+                    Text(stringResource(R.string.nav_providers), style = MaterialTheme.typography.headlineLarge)
                     Text(
-                        "Optional public datasets can populate a profile's nearby Wi-Fi and cellular identity.",
+                        stringResource(R.string.providers_desc),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             item {
-                SectionCard(title = "Credentials", iconRes = R.drawable.ms_settings_24) {
+                SectionCard(title = stringResource(R.string.credentials), iconRes = R.drawable.ms_settings_24) {
                     Text(
-                        "Secrets stay in GeoShift's private local preferences and are never included with exported profiles.",
+                        stringResource(R.string.credentials_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     OutlinedTextField(
                         value = openCell,
                         onValueChange = { openCell = it.trim() },
-                        label = { Text("OpenCellID API key") },
+                        label = { Text(stringResource(R.string.open_cell_api_key)) },
                         singleLine = true,
                         visualTransformation = if (revealSecrets) VisualTransformation.None else PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
@@ -599,20 +611,20 @@ private fun ProvidersScreen(
                     OutlinedTextField(
                         value = wigleName,
                         onValueChange = { wigleName = it.trim() },
-                        label = { Text("WiGLE token name") },
+                        label = { Text(stringResource(R.string.wigle_token_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = wigleToken,
                         onValueChange = { wigleToken = it.trim() },
-                        label = { Text("WiGLE token") },
+                        label = { Text(stringResource(R.string.wigle_token)) },
                         singleLine = true,
                         visualTransformation = if (revealSecrets) VisualTransformation.None else PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                     TextButton(onClick = { revealSecrets = !revealSecrets }) {
-                        Text(if (revealSecrets) "Hide secrets" else "Show secrets")
+                        Text(if (revealSecrets) stringResource(R.string.hide_secrets) else stringResource(R.string.show_secrets))
                     }
                     Button(
                         onClick = {
@@ -625,24 +637,28 @@ private fun ProvidersScreen(
                             )
                         },
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Save provider settings") }
+                    ) { Text(stringResource(R.string.save_provider_settings)) }
                 }
             }
             item {
-                SectionCard(title = "Radio environment", iconRes = R.drawable.ms_wifi_24) {
+                SectionCard(title = stringResource(R.string.radio_environment), iconRes = R.drawable.ms_wifi_24) {
                     Text(state.radioStatus, style = MaterialTheme.typography.bodyMedium)
                     FilledTonalButton(
                         onClick = actions.previewRadio,
                         enabled = !state.isRadioBusy && state.profiles.isNotEmpty(),
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text(if (state.isRadioBusy) "Querying…" else "Preview around latest profile") }
+                    ) {
+                        Text(if (state.isRadioBusy) stringResource(R.string.querying) else stringResource(R.string.preview_latest_profile))
+                    }
                     Button(
                         onClick = actions.applyRadioSuggestion,
                         enabled = !state.isRadioBusy && state.serviceConnected && state.profiles.isNotEmpty(),
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text(if (state.isRadioBusy) "Querying…" else "Apply nearest radio identity") }
+                    ) {
+                        Text(if (state.isRadioBusy) stringResource(R.string.querying) else stringResource(R.string.apply_nearest_radio))
+                    }
                     Text(
-                        "Apply uses the nearest returned Wi-Fi and cell record for the most recently synchronized profile. Review the profile before relying on it for testing.",
+                        stringResource(R.string.radio_apply_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
