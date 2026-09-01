@@ -43,6 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,19 +84,19 @@ internal fun ProfileEditorScreen(
         latitudeText != profile.latitude.toString() || longitudeText != profile.longitude.toString()
 
     val packageError = when {
-        draft.targetPackage.isBlank() -> "Choose an app or enter its package name"
-        packageConflict -> "A profile for this app already exists"
+        draft.targetPackage.isBlank() -> stringResource(R.string.choose_app_error)
+        packageConflict -> stringResource(R.string.profile_exists_error)
         else -> null
     }
-    val timezoneError = validationErrors.firstOrNull { it.startsWith("Unknown time zone") }
-    val localeError = validationErrors.firstOrNull { it.startsWith("Invalid locale tag") }
-    val countryError = validationErrors.firstOrNull { it.startsWith("Country code") }
-    val latitudeError = validationErrors.firstOrNull { it.startsWith("Latitude") }
-    val longitudeError = validationErrors.firstOrNull { it.startsWith("Longitude") }
-    val bssidError = validationErrors.firstOrNull { it.startsWith("Wi-Fi BSSID") }
-    val mccError = validationErrors.firstOrNull { it.startsWith("MCC") }
-    val mncError = validationErrors.firstOrNull { it.startsWith("MNC") }
-    val operatorPairError = validationErrors.firstOrNull { it.startsWith("MCC and MNC") }
+    val timezoneError = validationErrors.any { it.startsWith("Unknown time zone") }
+    val localeError = validationErrors.any { it.startsWith("Invalid locale tag") }
+    val countryError = validationErrors.any { it.startsWith("Country code") }
+    val latitudeError = validationErrors.any { it.startsWith("Latitude") }
+    val longitudeError = validationErrors.any { it.startsWith("Longitude") }
+    val bssidError = validationErrors.any { it.startsWith("Wi-Fi BSSID") }
+    val mccError = validationErrors.any { it.startsWith("MCC must") }
+    val mncError = validationErrors.any { it.startsWith("MNC must") }
+    val operatorPairError = validationErrors.any { it.startsWith("MCC and MNC") }
 
     fun requestClose() {
         if (hasChanges) confirmDiscard = true else onBack()
@@ -113,10 +114,10 @@ internal fun ProfileEditorScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(if (originalPackage == null) "New profile" else appLabel(draft.targetPackage, apps)) },
+                title = { Text(if (originalPackage == null) stringResource(R.string.new_profile) else appLabel(draft.targetPackage, apps)) },
                 navigationIcon = {
                     IconButton(onClick = ::requestClose) {
-                        Symbol(R.drawable.ms_arrow_back_24, contentDescription = "Back")
+                        Symbol(R.drawable.ms_arrow_back_24, contentDescription = stringResource(R.string.back))
                     }
                 },
             )
@@ -130,12 +131,12 @@ internal fun ProfileEditorScreen(
                     ) {
                         when {
                             !serviceConnected -> Text(
-                                "Connect the framework service before saving.",
+                                stringResource(R.string.connect_framework_before_save),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.error,
                             )
                             validationErrors.isNotEmpty() -> Text(
-                                "Fix ${validationErrors.size} ${if (validationErrors.size == 1) "issue" else "issues"} before saving.",
+                                stringResource(R.string.fix_issues_before_save, validationErrors.size),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -144,7 +145,7 @@ internal fun ProfileEditorScreen(
                             onClick = { onSave(draft, originalPackage) },
                             enabled = serviceConnected && validationErrors.isEmpty(),
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Save profile") }
+                        ) { Text(stringResource(R.string.save_profile)) }
                     }
                 }
             }
@@ -157,7 +158,7 @@ internal fun ProfileEditorScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 item {
-                    SectionCard(title = "Application", iconRes = R.drawable.ms_apps_24) {
+                    SectionCard(title = stringResource(R.string.section_application), iconRes = R.drawable.ms_apps_24) {
                         if (draft.targetPackage.isNotBlank()) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 AppIcon(draft.targetPackage, appLabel(draft.targetPackage, apps))
@@ -182,7 +183,7 @@ internal fun ProfileEditorScreen(
                         OutlinedTextField(
                             value = draft.targetPackage,
                             onValueChange = { draft = draft.copy(targetPackage = it.trim()) },
-                            label = { Text("Package name") },
+                            label = { Text(stringResource(R.string.package_name)) },
                             placeholder = { Text("com.example.app") },
                             singleLine = true,
                             isError = packageError != null,
@@ -192,21 +193,21 @@ internal fun ProfileEditorScreen(
                         OutlinedButton(onClick = { showAppPicker = true }, modifier = Modifier.fillMaxWidth()) {
                             Symbol(R.drawable.ms_search_24)
                             Spacer(Modifier.width(8.dp))
-                            Text("Choose installed app")
+                            Text(stringResource(R.string.choose_installed_app))
                         }
                         SwitchSetting(
-                            title = "Profile enabled",
-                            supporting = "Temporarily disable this profile without deleting its settings.",
+                            title = stringResource(R.string.profile_enabled),
+                            supporting = stringResource(R.string.profile_enabled_desc),
                             checked = draft.enabled,
                             onCheckedChange = { draft = draft.copy(enabled = it) },
                         )
                     }
                 }
                 item {
-                    SectionCard(title = "Follow VPN", iconRes = R.drawable.ms_public_24) {
+                    SectionCard(title = stringResource(R.string.section_follow_vpn), iconRes = R.drawable.ms_public_24) {
                         SwitchSetting(
-                            title = "Synchronize with current exit IP",
-                            supporting = "Keep region fields aligned with the current network exit.",
+                            title = stringResource(R.string.sync_current_exit),
+                            supporting = stringResource(R.string.sync_current_exit_desc),
                             checked = draft.followVpn,
                             onCheckedChange = { draft = draft.copy(followVpn = it) },
                         )
@@ -214,39 +215,41 @@ internal fun ProfileEditorScreen(
                             onClick = { onSync(draft) },
                             enabled = serviceConnected && !isSyncing && draft.targetPackage.isNotBlank() && !packageConflict,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text(if (isSyncing) "Synchronizing…" else "Sync this profile now") }
+                        ) {
+                            Text(if (isSyncing) stringResource(R.string.synchronizing) else stringResource(R.string.sync_profile_now))
+                        }
                     }
                 }
                 item {
-                    SectionCard(title = "Region identity", iconRes = R.drawable.ms_location_on_24) {
+                    SectionCard(title = stringResource(R.string.section_region_identity), iconRes = R.drawable.ms_location_on_24) {
                         OutlinedTextField(
                             value = draft.timezoneId,
                             onValueChange = { draft = draft.copy(timezoneId = it.trim()) },
-                            label = { Text("Time zone") },
+                            label = { Text(stringResource(R.string.field_timezone)) },
                             placeholder = { Text("America/Los_Angeles") },
                             singleLine = true,
-                            isError = timezoneError != null,
-                            supportingText = timezoneError?.let { message -> { Text(message) } },
+                            isError = timezoneError,
+                            supportingText = if (timezoneError) ({ Text(stringResource(R.string.error_invalid_timezone)) }) else null,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         OutlinedTextField(
                             value = draft.localeTag,
                             onValueChange = { draft = draft.copy(localeTag = it.trim()) },
-                            label = { Text("Locale") },
+                            label = { Text(stringResource(R.string.field_locale)) },
                             placeholder = { Text("en-US") },
                             singleLine = true,
-                            isError = localeError != null,
-                            supportingText = localeError?.let { message -> { Text(message) } },
+                            isError = localeError,
+                            supportingText = if (localeError) ({ Text(stringResource(R.string.error_invalid_locale)) }) else null,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         OutlinedTextField(
                             value = draft.countryCode,
                             onValueChange = { draft = draft.copy(countryCode = it.trim().uppercase()) },
-                            label = { Text("Country") },
+                            label = { Text(stringResource(R.string.field_country)) },
                             placeholder = { Text("US") },
                             singleLine = true,
-                            isError = countryError != null,
-                            supportingText = countryError?.let { message -> { Text(message) } },
+                            isError = countryError,
+                            supportingText = if (countryError) ({ Text(stringResource(R.string.error_country_code)) }) else null,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -256,10 +259,10 @@ internal fun ProfileEditorScreen(
                                     latitudeText = it
                                     draft = draft.copy(latitude = it.toDoubleOrNull() ?: Double.NaN)
                                 },
-                                label = { Text("Latitude") },
+                                label = { Text(stringResource(R.string.field_latitude)) },
                                 singleLine = true,
-                                isError = latitudeError != null,
-                                supportingText = latitudeError?.let { { Text("−90…90") } },
+                                isError = latitudeError,
+                                supportingText = if (latitudeError) ({ Text("−90…90") }) else null,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                                 modifier = Modifier.weight(1f),
                             )
@@ -269,10 +272,10 @@ internal fun ProfileEditorScreen(
                                     longitudeText = it
                                     draft = draft.copy(longitude = it.toDoubleOrNull() ?: Double.NaN)
                                 },
-                                label = { Text("Longitude") },
+                                label = { Text(stringResource(R.string.field_longitude)) },
                                 singleLine = true,
-                                isError = longitudeError != null,
-                                supportingText = longitudeError?.let { { Text("−180…180") } },
+                                isError = longitudeError,
+                                supportingText = if (longitudeError) ({ Text("−180…180") }) else null,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                                 modifier = Modifier.weight(1f),
                             )
@@ -280,10 +283,10 @@ internal fun ProfileEditorScreen(
                     }
                 }
                 item {
-                    SectionCard(title = "Radio identity", iconRes = R.drawable.ms_wifi_24) {
+                    SectionCard(title = stringResource(R.string.section_radio_identity), iconRes = R.drawable.ms_wifi_24) {
                         SwitchSetting(
-                            "Wi-Fi identity",
-                            "Override the current SSID/BSSID for this app.",
+                            stringResource(R.string.wifi_identity),
+                            stringResource(R.string.wifi_identity_desc),
                             draft.wifiEnabled,
                         ) { draft = draft.copy(wifiEnabled = it) }
                         if (draft.wifiEnabled) {
@@ -291,7 +294,7 @@ internal fun ProfileEditorScreen(
                                 value = draft.wifiSsid,
                                 onValueChange = { draft = draft.copy(wifiSsid = it) },
                                 label = { Text("SSID") },
-                                placeholder = { Text("Nearby network") },
+                                placeholder = { Text(stringResource(R.string.nearby_network)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
@@ -301,15 +304,15 @@ internal fun ProfileEditorScreen(
                                 label = { Text("BSSID") },
                                 placeholder = { Text("aa:bb:cc:dd:ee:ff") },
                                 singleLine = true,
-                                isError = bssidError != null,
-                                supportingText = bssidError?.let { message -> { Text(message) } },
+                                isError = bssidError,
+                                supportingText = if (bssidError) ({ Text(stringResource(R.string.error_invalid_bssid)) }) else null,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
                         HorizontalDivider()
                         SwitchSetting(
-                            "Telephony identity",
-                            "Override country, MCC/MNC and operator name where supported.",
+                            stringResource(R.string.telephony_identity),
+                            stringResource(R.string.telephony_identity_desc),
                             draft.telephonyEnabled,
                         ) { draft = draft.copy(telephonyEnabled = it) }
                         if (draft.telephonyEnabled) {
@@ -320,7 +323,8 @@ internal fun ProfileEditorScreen(
                                     label = { Text("MCC") },
                                     placeholder = { Text("310") },
                                     singleLine = true,
-                                    isError = mccError != null || operatorPairError != null,
+                                    isError = mccError || operatorPairError,
+                                    supportingText = if (mccError) ({ Text(stringResource(R.string.error_invalid_mcc)) }) else null,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     modifier = Modifier.weight(1f),
                                 )
@@ -330,25 +334,30 @@ internal fun ProfileEditorScreen(
                                     label = { Text("MNC") },
                                     placeholder = { Text("260") },
                                     singleLine = true,
-                                    isError = mncError != null || operatorPairError != null,
+                                    isError = mncError || operatorPairError,
+                                    supportingText = if (mncError) ({ Text(stringResource(R.string.error_invalid_mnc)) }) else null,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     modifier = Modifier.weight(1f),
                                 )
                             }
-                            if (operatorPairError != null) {
-                                Text(operatorPairError, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            if (operatorPairError) {
+                                Text(
+                                    stringResource(R.string.error_mcc_mnc_pair),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
                             }
                             OutlinedTextField(
                                 value = draft.operatorName,
                                 onValueChange = { draft = draft.copy(operatorName = it) },
-                                label = { Text("Operator name (optional)") },
+                                label = { Text(stringResource(R.string.operator_name_optional)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
                         if (draft.radioSource.isNotBlank()) {
                             Text(
-                                "Source: ${draft.radioSource}",
+                                stringResource(R.string.source_format, draft.radioSource),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -356,53 +365,65 @@ internal fun ProfileEditorScreen(
                     }
                 }
                 item {
-                    SectionCard(title = "Overrides", iconRes = R.drawable.ms_settings_24) {
-                        SwitchSetting("Location", "Use the profile coordinates where supported.", draft.locationEnabled) {
-                            draft = draft.copy(locationEnabled = it)
-                        }
+                    SectionCard(title = stringResource(R.string.section_overrides), iconRes = R.drawable.ms_settings_24) {
+                        SwitchSetting(
+                            stringResource(R.string.override_location),
+                            stringResource(R.string.override_location_desc),
+                            draft.locationEnabled,
+                        ) { draft = draft.copy(locationEnabled = it) }
                         HorizontalDivider()
-                        SwitchSetting("Geocoder", "Return the profile city, region and country for its coordinates.", draft.geocoderEnabled) {
-                            draft = draft.copy(geocoderEnabled = it)
-                        }
+                        SwitchSetting(
+                            stringResource(R.string.override_geocoder),
+                            stringResource(R.string.override_geocoder_desc),
+                            draft.geocoderEnabled,
+                        ) { draft = draft.copy(geocoderEnabled = it) }
                         HorizontalDivider()
-                        SwitchSetting("Time zone", "Use the profile time zone where supported.", draft.timezoneEnabled) {
-                            draft = draft.copy(timezoneEnabled = it)
-                        }
+                        SwitchSetting(
+                            stringResource(R.string.field_timezone),
+                            stringResource(R.string.override_timezone_desc),
+                            draft.timezoneEnabled,
+                        ) { draft = draft.copy(timezoneEnabled = it) }
                         HorizontalDivider()
-                        SwitchSetting("Locale", "Use the profile locale where supported.", draft.localeEnabled) {
-                            draft = draft.copy(localeEnabled = it)
-                        }
+                        SwitchSetting(
+                            stringResource(R.string.field_locale),
+                            stringResource(R.string.override_locale_desc),
+                            draft.localeEnabled,
+                        ) { draft = draft.copy(localeEnabled = it) }
                     }
                 }
                 item {
                     SectionCard(
-                        title = "Consistency",
+                        title = stringResource(R.string.section_consistency),
                         iconRes = if (diagnosticIssues.isEmpty()) R.drawable.ms_check_circle_24 else R.drawable.ms_warning_24,
                     ) {
                         if (diagnosticIssues.isEmpty()) {
-                            Text("No obvious profile conflicts detected.", style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.no_profile_conflicts), style = MaterialTheme.typography.bodyMedium)
                         } else {
                             diagnosticIssues.forEach { issue ->
-                                Text("${issue.severity}: ${issue.message}", style = MaterialTheme.typography.bodyMedium)
+                                val severity = when (issue.severity) {
+                                    ProfileDiagnostics.Severity.ERROR -> stringResource(R.string.severity_error)
+                                    ProfileDiagnostics.Severity.WARNING -> stringResource(R.string.severity_warning)
+                                }
+                                Text("$severity: ${localizedDiagnostic(issue.message)}", style = MaterialTheme.typography.bodyMedium)
                             }
                         }
                     }
                 }
                 item {
-                    SectionCard(title = "Tools") {
+                    SectionCard(title = stringResource(R.string.section_tools)) {
                         OutlinedButton(
                             onClick = { onRequestScope(draft.targetPackage) },
                             enabled = serviceConnected && draft.targetPackage.isNotBlank() && !packageConflict,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Request app scope") }
+                        ) { Text(stringResource(R.string.request_app_scope)) }
                         OutlinedButton(
                             onClick = { onExport(draft) },
                             enabled = validationErrors.isEmpty(),
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Export profile JSON") }
+                        ) { Text(stringResource(R.string.export_profile_json)) }
                         if (originalPackage != null) {
                             TextButton(onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth()) {
-                                Text("Delete profile")
+                                Text(stringResource(R.string.delete_profile))
                             }
                         }
                     }
@@ -426,25 +447,60 @@ internal fun ProfileEditorScreen(
     if (confirmDelete && originalPackage != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Delete profile?") },
-            text = { Text("This removes the saved profile for $originalPackage.") },
+            title = { Text(stringResource(R.string.delete_profile_question)) },
+            text = { Text(stringResource(R.string.delete_profile_desc, originalPackage)) },
             confirmButton = {
-                TextButton(onClick = { confirmDelete = false; onDelete(originalPackage) }) { Text("Delete") }
+                TextButton(onClick = { confirmDelete = false; onDelete(originalPackage) }) {
+                    Text(stringResource(R.string.delete))
+                }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.cancel)) }
+            },
         )
     }
 
     if (confirmDiscard) {
         AlertDialog(
             onDismissRequest = { confirmDiscard = false },
-            title = { Text("Discard changes?") },
-            text = { Text("This profile has unsaved changes.") },
+            title = { Text(stringResource(R.string.discard_changes_question)) },
+            text = { Text(stringResource(R.string.discard_changes_desc)) },
             confirmButton = {
-                TextButton(onClick = { confirmDiscard = false; onBack() }) { Text("Discard") }
+                TextButton(onClick = { confirmDiscard = false; onBack() }) { Text(stringResource(R.string.discard)) }
             },
-            dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep editing") } },
+            dismissButton = {
+                TextButton(onClick = { confirmDiscard = false }) { Text(stringResource(R.string.keep_editing)) }
+            },
         )
+    }
+}
+
+@Composable
+private fun localizedDiagnostic(message: String): String {
+    val localeMatch = Regex("Locale region (\\S+) differs from country (\\S+)").matchEntire(message)
+    return when {
+        message.startsWith("Unknown time zone") -> stringResource(R.string.error_invalid_timezone)
+        message.startsWith("Invalid locale tag") -> stringResource(R.string.error_invalid_locale)
+        message.startsWith("Country code") -> stringResource(R.string.error_country_code)
+        message.startsWith("Latitude") -> "−90…90"
+        message.startsWith("Longitude") -> "−180…180"
+        message.startsWith("Wi-Fi BSSID") -> stringResource(R.string.error_invalid_bssid)
+        message.startsWith("MCC must") -> stringResource(R.string.error_invalid_mcc)
+        message.startsWith("MNC must") -> stringResource(R.string.error_invalid_mnc)
+        message.startsWith("MCC and MNC") -> stringResource(R.string.error_mcc_mnc_pair)
+        localeMatch != null -> stringResource(
+            R.string.diag_locale_country,
+            localeMatch.groupValues[1],
+            localeMatch.groupValues[2],
+        )
+        message == "Location is 0,0; set a real test location or synchronize from GeoIP" -> stringResource(R.string.diag_zero_location)
+        message == "Geocoder override is enabled while location override is disabled" -> stringResource(R.string.diag_geocoder_location_off)
+        message == "Wi-Fi override is enabled but no SSID/BSSID is configured" -> stringResource(R.string.diag_wifi_empty)
+        message == "Telephony override is enabled but MCC/MNC is not configured" -> stringResource(R.string.diag_cell_empty)
+        message == "Radio identity has no recorded source; verify it matches the selected location" -> stringResource(R.string.diag_radio_source_empty)
+        message == "Follow VPN is enabled but no successful exit-IP sync is recorded" -> stringResource(R.string.diag_follow_unsynced)
+        message == "Last exit-IP sync is older than 24 hours" -> stringResource(R.string.diag_follow_stale)
+        else -> message
     }
 }
 
@@ -464,20 +520,20 @@ private fun AppPickerSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.adaptiveContentWidth().padding(horizontal = 20.dp).imePadding()) {
-                Text("Choose app", style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(R.string.choose_app), style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
                     leadingIcon = { Symbol(R.drawable.ms_search_24) },
-                    placeholder = { Text("Search apps or package names") },
+                    placeholder = { Text(stringResource(R.string.search_apps)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(10.dp))
                 if (filtered.isEmpty()) {
                     Text(
-                        "No matching launchable apps.",
+                        stringResource(R.string.no_matching_apps),
                         modifier = Modifier.padding(vertical = 24.dp),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
