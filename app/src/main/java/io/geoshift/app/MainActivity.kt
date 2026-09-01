@@ -42,12 +42,12 @@ class MainActivity : ComponentActivity() {
 
     private var destination by mutableStateOf(Destination.Overview)
     private var serviceConnected by mutableStateOf(false)
-    private var serviceLabel by mutableStateOf("Connecting to LSPosed…")
+    private var serviceLabel by mutableStateOf("")
     private var vpnActive by mutableStateOf(false)
     private var profiles by mutableStateOf<List<GeoProfile>>(emptyList())
     private var providerSettings by mutableStateOf(ProviderSettings.Snapshot())
-    private var syncStatus by mutableStateOf("No synchronization yet")
-    private var radioStatus by mutableStateOf("Radio providers not configured")
+    private var syncStatus by mutableStateOf("")
+    private var radioStatus by mutableStateOf("")
     private var notice by mutableStateOf<String?>(null)
     private var syncInFlight by mutableStateOf(false)
     private var radioQueryInFlight by mutableStateOf(false)
@@ -65,38 +65,39 @@ class MainActivity : ComponentActivity() {
         runCatching {
             contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use {
                 it.write(ProfileCodec.encode(profile))
-            } ?: error("Could not open export destination")
-        }.onSuccess { showNotice("Profile exported") }
-            .onFailure { toast("Export failed: ${it.message}") }
+            } ?: error(getString(R.string.could_not_open_export))
+        }.onSuccess { showNotice(getString(R.string.profile_exported)) }
+            .onFailure { toast(getString(R.string.export_failed, it.message.orEmpty())) }
     }
 
     private val importLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri == null) return@registerForActivityResult
-        val service = GeoShiftApp.service ?: return@registerForActivityResult toast("LSPosed service is not connected")
+        val service = GeoShiftApp.service
+            ?: return@registerForActivityResult toast(getString(R.string.lsposed_not_connected))
         runCatching {
             val text = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                ?: error("Could not read profile file")
+                ?: error(getString(R.string.could_not_read_profile))
             ProfileCodec.decode(text)
         }.onSuccess { imported ->
             val errors = imported.validate()
             if (errors.isNotEmpty()) {
-                toast("Import rejected: ${errors.first()}")
+                toast(getString(R.string.import_rejected, localizedProfileError(errors.first())))
             } else if (ProfileStoreV2.save(service, imported)) {
                 refreshProfiles(service)
                 destination = Destination.Profiles
                 editingProfile = imported
                 editingOriginalPackage = imported.targetPackage
-                showNotice("Profile imported")
+                showNotice(getString(R.string.profile_imported))
             }
-        }.onFailure { toast("Import failed: ${it.message}") }
+        }.onFailure { toast(getString(R.string.import_failed, it.message.orEmpty())) }
     }
 
     private val serviceListener: (XposedService?) -> Unit = { service ->
         runOnUiThread {
             serviceConnected = service != null
-            serviceLabel = if (service == null) "LSPosed service unavailable"
+            serviceLabel = if (service == null) getString(R.string.lsposed_unavailable)
             else "${service.frameworkName} · API ${service.apiVersion}"
             if (service != null) refreshProfiles(service)
         }
@@ -105,6 +106,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        serviceLabel = getString(R.string.connecting_lsposed)
+        syncStatus = getString(R.string.no_sync_yet)
+        radioStatus = getString(R.string.radio_not_configured)
         providerSettings = ProviderSettings.load(this)
         updateProviderStatus()
 
@@ -195,57 +199,57 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun saveProfile(profile: GeoProfile, originalPackage: String?) {
-        val service = GeoShiftApp.service ?: return toast("LSPosed service is not connected")
+        val service = GeoShiftApp.service ?: return toast(getString(R.string.lsposed_not_connected))
         val errors = profile.validate()
-        if (errors.isNotEmpty()) return toast(errors.first())
+        if (errors.isNotEmpty()) return toast(localizedProfileError(errors.first()))
         if (!originalPackage.isNullOrBlank() && originalPackage != profile.targetPackage) {
             ProfileStoreV2.delete(service, originalPackage)
         }
-        if (!ProfileStoreV2.save(service, profile)) return toast("Could not save profile")
+        if (!ProfileStoreV2.save(service, profile)) return toast(getString(R.string.could_not_save_profile))
         refreshProfiles(service)
         if (profile.enabled && profile.followVpn) updateFollowService(requestPermission = true)
         closeEditor()
-        showNotice("Profile saved")
+        showNotice(getString(R.string.profile_saved))
     }
 
     private fun toggleProfile(profile: GeoProfile) {
-        val service = GeoShiftApp.service ?: return toast("LSPosed service is not connected")
-        if (!ProfileStoreV2.save(service, profile)) return toast("Could not update profile")
+        val service = GeoShiftApp.service ?: return toast(getString(R.string.lsposed_not_connected))
+        if (!ProfileStoreV2.save(service, profile)) return toast(getString(R.string.could_not_update_profile))
         refreshProfiles(service)
     }
 
     private fun deleteProfile(packageName: String) {
-        val service = GeoShiftApp.service ?: return toast("LSPosed service is not connected")
+        val service = GeoShiftApp.service ?: return toast(getString(R.string.lsposed_not_connected))
         if (ProfileStoreV2.delete(service, packageName)) {
             refreshProfiles(service)
             closeEditor()
-            showNotice("Profile deleted")
+            showNotice(getString(R.string.profile_deleted))
         }
     }
 
     private fun syncProfile(base: GeoProfile) {
-        val service = GeoShiftApp.service ?: return toast("LSPosed service is not connected")
+        val service = GeoShiftApp.service ?: return toast(getString(R.string.lsposed_not_connected))
         if (syncInFlight) return
         val errors = base.validate()
-        if (errors.isNotEmpty()) return toast(errors.first())
+        if (errors.isNotEmpty()) return toast(localizedProfileError(errors.first()))
         syncInFlight = true
-        syncStatus = "Resolving current public exit…"
+        syncStatus = getString(R.string.resolving_public_exit)
         Thread {
             try {
                 val outcome = synchronizer.synchronize(base)
                 val updatedErrors = outcome.profile.validate()
-                if (updatedErrors.isNotEmpty()) error(updatedErrors.first())
-                if (!ProfileStoreV2.save(service, outcome.profile)) error("Could not save synchronized profile")
+                if (updatedErrors.isNotEmpty()) error(localizedProfileError(updatedErrors.first()))
+                if (!ProfileStoreV2.save(service, outcome.profile)) error(getString(R.string.could_not_save_synced_profile))
                 runOnUiThread {
                     editingProfile = outcome.profile
                     editingOriginalPackage = outcome.profile.targetPackage
                     syncStatus = "${outcome.geoIp.ip} · ${outcome.geoIp.city}, ${outcome.geoIp.countryCode}"
                     refreshProfiles(service)
-                    showNotice("Profile synchronized with VPN exit")
+                    showNotice(getString(R.string.profile_synced))
                 }
             } catch (error: Throwable) {
                 runOnUiThread {
-                    syncStatus = "Sync failed: ${error.message ?: error.javaClass.simpleName}"
+                    syncStatus = getString(R.string.sync_failed, error.message ?: error.javaClass.simpleName)
                     showNotice(syncStatus)
                 }
             } finally {
@@ -255,12 +259,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun syncAllFollowed() {
-        val service = GeoShiftApp.service ?: return toast("LSPosed service is not connected")
+        val service = GeoShiftApp.service ?: return toast(getString(R.string.lsposed_not_connected))
         if (syncInFlight) return
         val followed = profiles.filter { it.enabled && it.followVpn }
-        if (followed.isEmpty()) return toast("No enabled Follow VPN profiles")
+        if (followed.isEmpty()) return toast(getString(R.string.no_follow_profiles))
         syncInFlight = true
-        syncStatus = "Resolving one shared exit for ${followed.size} profiles…"
+        syncStatus = getString(R.string.resolving_shared_exit, followed.size)
         Thread {
             try {
                 val geoIp = synchronizer.resolveCurrentExit()
@@ -271,13 +275,20 @@ class MainActivity : ComponentActivity() {
                     if (outcome.profile.validate().isEmpty() && ProfileStoreV2.save(service, outcome.profile)) saved++
                 }
                 runOnUiThread {
-                    syncStatus = "Synced $saved/${followed.size} · ${geoIp.ip} · ${geoIp.city}, ${geoIp.countryCode}"
+                    syncStatus = getString(
+                        R.string.synced_profiles_format,
+                        saved,
+                        followed.size,
+                        geoIp.ip,
+                        geoIp.city,
+                        geoIp.countryCode,
+                    )
                     refreshProfiles(service)
-                    showNotice("Synchronized $saved Follow VPN profiles")
+                    showNotice(getString(R.string.synced_follow_profiles, saved))
                 }
             } catch (error: Throwable) {
                 runOnUiThread {
-                    syncStatus = "Sync failed: ${error.message ?: error.javaClass.simpleName}"
+                    syncStatus = getString(R.string.sync_failed, error.message ?: error.javaClass.simpleName)
                     showNotice(syncStatus)
                 }
             } finally {
@@ -287,23 +298,23 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestScope(packageName: String) {
-        val service = GeoShiftApp.service ?: return toast("LSPosed service is not connected")
+        val service = GeoShiftApp.service ?: return toast(getString(R.string.lsposed_not_connected))
         val pkg = packageName.trim()
-        if (pkg.isBlank()) return toast("Choose an app first")
+        if (pkg.isBlank()) return toast(getString(R.string.choose_app_first))
         service.requestScope(listOf(pkg), object : XposedService.OnScopeEventListener {
             override fun onScopeRequestApproved(approved: List<String>) {
-                runOnUiThread { showNotice("Scope approved: ${approved.joinToString()}") }
+                runOnUiThread { showNotice(getString(R.string.scope_approved, approved.joinToString())) }
             }
 
             override fun onScopeRequestFailed(message: String) {
-                runOnUiThread { toast("Scope request failed: $message") }
+                runOnUiThread { toast(getString(R.string.scope_failed, message)) }
             }
         })
     }
 
     private fun exportProfile(profile: GeoProfile) {
         val errors = profile.validate()
-        if (errors.isNotEmpty()) return toast(errors.first())
+        if (errors.isNotEmpty()) return toast(localizedProfileError(errors.first()))
         pendingExportProfile = profile
         val name = profile.targetPackage.replace('.', '-').ifBlank { "profile" }
         exportLauncher.launch("GeoShift-$name.json")
@@ -311,20 +322,21 @@ class MainActivity : ComponentActivity() {
 
     private fun saveProviderSettings(settings: ProviderSettings.Snapshot) {
         if (settings.wigleTokenName.isBlank() != settings.wigleToken.isBlank()) {
-            return toast("Enter both WiGLE token name and token")
+            return toast(getString(R.string.enter_wigle_both))
         }
         ProviderSettings.save(this, settings)
         providerSettings = ProviderSettings.load(this)
         updateProviderStatus()
-        showNotice("Provider settings saved locally")
+        showNotice(getString(R.string.provider_settings_saved))
     }
 
     private fun updateProviderStatus() {
         val active = buildList {
-            if (providerSettings.openCellIdApiKey.isNotBlank()) add("OpenCellID cells")
-            if (providerSettings.wigleTokenName.isNotBlank() && providerSettings.wigleToken.isNotBlank()) add("WiGLE Wi-Fi")
+            if (providerSettings.openCellIdApiKey.isNotBlank()) add("OpenCellID")
+            if (providerSettings.wigleTokenName.isNotBlank() && providerSettings.wigleToken.isNotBlank()) add("WiGLE")
         }
-        radioStatus = if (active.isEmpty()) "Radio providers not configured" else "Ready: ${active.joinToString()}"
+        radioStatus = if (active.isEmpty()) getString(R.string.radio_not_configured)
+        else getString(R.string.radio_ready, active.joinToString())
     }
 
     private fun buildRadioProvider(): RadioEnvironmentProvider? {
@@ -350,23 +362,25 @@ class MainActivity : ComponentActivity() {
 
     private fun queryRadioEnvironment(apply: Boolean) {
         if (radioQueryInFlight) return
-        val provider = buildRadioProvider() ?: return toast("Configure at least one provider first")
+        val provider = buildRadioProvider() ?: return toast(getString(R.string.configure_provider_first))
         val profile = profiles.maxByOrNull { it.lastSyncAtEpochMs }
             ?: profiles.firstOrNull()
-            ?: return toast("Create a profile first")
-        if (!profile.latitude.isFinite() || !profile.longitude.isFinite()) return toast("Profile coordinates are invalid")
+            ?: return toast(getString(R.string.create_profile_first))
+        if (!profile.latitude.isFinite() || !profile.longitude.isFinite()) {
+            return toast(getString(R.string.profile_coordinates_invalid))
+        }
 
         radioQueryInFlight = true
-        radioStatus = "Querying around ${profile.lastSyncCity.ifBlank { profile.targetPackage }}…"
+        radioStatus = getString(R.string.querying_around, profile.lastSyncCity.ifBlank { profile.targetPackage })
         Thread {
             try {
                 val wifi = provider.nearbyWifi(profile.latitude, profile.longitude, 750)
                 val cells = provider.nearbyCells(profile.latitude, profile.longitude, 900)
                 if (apply) {
-                    val service = GeoShiftApp.service ?: error("LSPosed service is not connected")
+                    val service = GeoShiftApp.service ?: error(getString(R.string.lsposed_not_connected))
                     val nearestWifi = wifi.firstOrNull()
                     val nearestCell = cells.firstOrNull()
-                    if (nearestWifi == null && nearestCell == null) error("No nearby radio records were returned")
+                    if (nearestWifi == null && nearestCell == null) error(getString(R.string.no_radio_records))
                     val source = listOfNotNull(nearestWifi?.source, nearestCell?.source)
                         .filter { it.isNotBlank() }
                         .distinct()
@@ -378,23 +392,23 @@ class MainActivity : ComponentActivity() {
                         telephonyEnabled = nearestCell != null,
                         mcc = nearestCell?.mcc?.toString()?.padStart(3, '0').orEmpty(),
                         mnc = nearestCell?.mnc?.toString()?.padStart(2, '0').orEmpty(),
-                        radioSource = source.ifBlank { "provider suggestion" },
+                        radioSource = source.ifBlank { getString(R.string.provider_suggestion) },
                     )
                     val errors = updated.validate()
-                    if (errors.isNotEmpty()) error(errors.first())
-                    if (!ProfileStoreV2.save(service, updated)) error("Could not save radio suggestion")
+                    if (errors.isNotEmpty()) error(localizedProfileError(errors.first()))
+                    if (!ProfileStoreV2.save(service, updated)) error(getString(R.string.could_not_save_radio))
                     runOnUiThread {
                         refreshProfiles(service)
                         editingProfile = editingProfile?.takeIf { it.targetPackage != updated.targetPackage } ?: updated
-                        radioStatus = "Applied ${if (nearestWifi != null) "Wi-Fi" else ""}${if (nearestWifi != null && nearestCell != null) " + " else ""}${if (nearestCell != null) "cell identity" else ""} to ${updated.targetPackage}"
-                        showNotice("Applied nearby radio identity to ${appLabelFor(updated.targetPackage)}")
+                        radioStatus = getString(R.string.radio_applied_format, appLabelFor(updated.targetPackage))
+                        showNotice(radioStatus)
                     }
                 } else {
                     val wifiPreview = wifi.take(3).joinToString { it.ssid?.ifBlank { it.bssid } ?: it.bssid }
                     val cellPreview = cells.take(3).joinToString { "${it.radio} ${it.mcc}/${it.mnc}/${it.areaCode}/${it.cellId}" }
                     runOnUiThread {
                         radioStatus = buildString {
-                            append("${wifi.size} Wi-Fi · ${cells.size} cells")
+                            append("${wifi.size} ${getString(R.string.tag_wifi)} · ${cells.size} ${getString(R.string.tag_cell)}")
                             if (wifiPreview.isNotBlank()) append(" · $wifiPreview")
                             if (cellPreview.isNotBlank()) append(" · $cellPreview")
                         }
@@ -402,7 +416,7 @@ class MainActivity : ComponentActivity() {
                 }
             } catch (error: Throwable) {
                 runOnUiThread {
-                    radioStatus = "Provider query failed: ${error.message ?: error.javaClass.simpleName}"
+                    radioStatus = getString(R.string.provider_query_failed, error.message ?: error.javaClass.simpleName)
                     if (apply) showNotice(radioStatus)
                 }
             } finally {
@@ -453,11 +467,25 @@ class MainActivity : ComponentActivity() {
         val whenText = if (profile.lastSyncAtEpochMs > 0L) {
             DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
                 .format(Date(profile.lastSyncAtEpochMs))
-        } else "unknown time"
+        } else getString(R.string.unknown_time)
         val place = listOf(profile.lastSyncCity, profile.lastSyncRegion, profile.countryCode)
             .filter { it.isNotBlank() }
             .joinToString(", ")
-        return "Last sync ${profile.lastSyncIp} · $place · $whenText"
+        return getString(R.string.last_sync_format, profile.lastSyncIp, place, whenText)
+    }
+
+    private fun localizedProfileError(message: String): String = when {
+        message.startsWith("Unknown time zone") -> getString(R.string.error_invalid_timezone)
+        message.startsWith("Invalid locale tag") -> getString(R.string.error_invalid_locale)
+        message.startsWith("Country code") -> getString(R.string.error_country_code)
+        message.startsWith("Latitude") -> "${getString(R.string.field_latitude)}: −90…90"
+        message.startsWith("Longitude") -> "${getString(R.string.field_longitude)}: −180…180"
+        message.startsWith("Wi-Fi BSSID") -> getString(R.string.error_invalid_bssid)
+        message.startsWith("MCC must") -> getString(R.string.error_invalid_mcc)
+        message.startsWith("MNC must") -> getString(R.string.error_invalid_mnc)
+        message.startsWith("MCC and MNC") -> getString(R.string.error_mcc_mnc_pair)
+        message.startsWith("Target package") -> getString(R.string.choose_app_error)
+        else -> message
     }
 
     private fun showNotice(message: String) {
