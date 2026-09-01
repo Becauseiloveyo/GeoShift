@@ -1,9 +1,10 @@
 package io.geoshift.app.core
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 object ProfileCodec {
-    private const val SCHEMA_VERSION = 3
+    private const val SCHEMA_VERSION = 4
 
     fun encode(profile: GeoProfile): String = JSONObject().apply {
         put("schemaVersion", SCHEMA_VERSION)
@@ -24,6 +25,7 @@ object ProfileCodec {
             put("wifiSsid", profile.wifiSsid)
             put("wifiBssid", profile.wifiBssid)
             put("wifiRssiDbm", profile.wifiRssiDbm)
+            put("wifiAccessPoints", JSONArray(WifiAccessPointCodec.encode(profile.wifiAccessPoints)))
             put("telephonyEnabled", profile.telephonyEnabled)
             put("mcc", profile.mcc)
             put("mnc", profile.mnc)
@@ -61,6 +63,7 @@ object ProfileCodec {
             wifiSsid = json.optString("wifiSsid", ""),
             wifiBssid = json.optString("wifiBssid", ""),
             wifiRssiDbm = json.optInt("wifiRssiDbm", -45),
+            wifiAccessPoints = WifiAccessPointCodec.decode(json.optJSONArray("wifiAccessPoints")?.toString()),
             telephonyEnabled = json.optBoolean("telephonyEnabled", false),
             mcc = json.optString("mcc", ""),
             mnc = json.optString("mnc", ""),
