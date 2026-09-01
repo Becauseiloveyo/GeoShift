@@ -29,6 +29,8 @@ jobs:
           gradle-version: "9.5.1"
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
+      - name: Compile Macrobenchmark suite
+        run: gradle :app:assembleBenchmark :benchmark:assembleBenchmark --stacktrace
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
       - name: Upload debug APK
