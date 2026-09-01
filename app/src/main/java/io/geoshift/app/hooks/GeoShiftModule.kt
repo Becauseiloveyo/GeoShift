@@ -15,6 +15,7 @@ import android.telephony.TelephonyManager
 import android.util.Log
 import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.ProfileStoreV2
+import io.geoshift.app.core.effectiveWifiAccessPoints
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 import java.lang.reflect.InvocationTargetException
@@ -106,11 +107,6 @@ class GeoShiftModule : XposedModule() {
         }.onFailure { log(Log.WARN, TAG, "Location getter hook failed", it) }
     }
 
-    /**
-     * Covers the public Android location delivery paths used by map and navigation apps.
-     * The listener wrapper is identity-preserving through removeUpdates(), and reads the
-     * AtomicReference at callback time so profile edits take effect without re-registering.
-     */
     private fun installLocationManagerHooks(profile: AtomicReference<GeoProfile?>) {
         runCatching {
             LocationManager::class.java.methods
@@ -207,7 +203,6 @@ class GeoShiftModule : XposedModule() {
         classLoader: ClassLoader,
         profile: AtomicReference<GeoProfile?>,
     ) {
-        // Google Play services LocationCallback exposes LocationResult to the app.
         runCatching {
             val resultClass = Class.forName("com.google.android.gms.location.LocationResult", false, classLoader)
             resultClass.methods.filter { it.name == "getLastLocation" && it.parameterCount == 0 }.forEach { method ->
@@ -223,7 +218,6 @@ class GeoShiftModule : XposedModule() {
             }
         }.onFailure { log(Log.DEBUG, TAG, "Google LocationResult not present or hook skipped", it) }
 
-        // Common Chinese location SDK result objects used by map/navigation apps.
         hookSdkCoordinateClass(classLoader, "com.amap.api.location.AMapLocation", profile)
         hookSdkCoordinateClass(classLoader, "com.baidu.location.BDLocation", profile)
     }
@@ -237,8 +231,6 @@ class GeoShiftModule : XposedModule() {
             val clazz = Class.forName(className, false, classLoader)
             listOf("getLatitude" to true, "getLongitude" to false).forEach { (name, latitude) ->
                 val method = clazz.getMethod(name)
-                // If the SDK inherits android.location.Location without overriding the method,
-                // the base Location hook already covers it and must not be installed twice.
                 if (method.declaringClass == Location::class.java) return@forEach
                 hook(method).intercept { chain ->
                     val current = profile.get()
@@ -319,18 +311,19 @@ class GeoShiftModule : XposedModule() {
             val scanMethod = WifiManager::class.java.getMethod("getScanResults")
             hook(scanMethod).intercept { chain ->
                 val current = profile.get()
-                if (!current.isWifiActive() || current!!.wifiBssid.isBlank() || Build.VERSION.SDK_INT < 30) {
+                val points = current?.effectiveWifiAccessPoints().orEmpty()
+                if (!current.isWifiActive() || points.isEmpty() || Build.VERSION.SDK_INT < 30) {
                     return@intercept chain.proceed()
                 }
-                listOf(
+                points.map { point ->
                     ScanResult().apply {
-                        SSID = current.wifiSsid
-                        BSSID = current.wifiBssid.lowercase()
-                        level = current.wifiRssiDbm
-                        frequency = 5200
+                        SSID = point.ssid
+                        BSSID = point.bssid.lowercase()
+                        level = point.rssiDbm
+                        frequency = point.frequencyMhz
                         timestamp = SystemClock.elapsedRealtimeNanos() / 1_000L
                     }
-                )
+                }
             }
         }.onFailure { log(Log.WARN, TAG, "Wi-Fi scan-result hook failed", it) }
     }
