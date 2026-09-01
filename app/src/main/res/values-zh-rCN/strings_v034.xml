@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="editor_mode_basic">基础</string>
+    <string name="editor_mode_advanced">高级</string>
+    <string name="editor_mode_desc">基础模式保留常用流程；高级模式显示原始无线和地区字段。</string>
+    <string name="profile_health">配置健康度</string>
+    <string name="health_score">一致性 %1$d%%</string>
+    <string name="health_map_ready">地图定位已就绪</string>
+    <string name="health_map_not_ready">地图定位信息不完整</string>
+    <string name="health_wifi_ready">Wi-Fi 扫描已就绪 · %1$d 个 AP</string>
+    <string name="health_wifi_not_ready">Wi-Fi 环境不完整</string>
+    <string name="health_cell_ready">蜂窝网络身份已就绪</string>
+    <string name="health_cell_basic">仅具备基础蜂窝网络身份</string>
+    <string name="nearby_access_points">附近接入点</string>
+    <string name="nearby_access_points_count">此配置已保存 %1$d 个接入点</string>
+    <string name="advanced_radio_fields">高级无线字段</string>
+    <string name="wifi_rssi">Wi-Fi RSSI（dBm）</string>
+    <string name="cell_radio">无线制式</string>
+    <string name="cell_area_code">TAC / LAC</string>
+    <string name="cell_id">Cell ID / NCI</string>
+    <string name="compatibility_note">LocationManager 已直接覆盖。目标应用包含对应 SDK 时，会自动启用 Google LocationResult、高德和百度定位适配。</string>
+</resources>
