@@ -58,10 +58,14 @@ object ProfileStoreV2 {
             wifiEnabled = prefs.getBoolean(key(packageName, ProfileStore.KEY_WIFI_ENABLED), false),
             wifiSsid = prefs.getString(key(packageName, ProfileStore.KEY_WIFI_SSID), "").orEmpty(),
             wifiBssid = prefs.getString(key(packageName, ProfileStore.KEY_WIFI_BSSID), "").orEmpty(),
+            wifiRssiDbm = prefs.getInt(key(packageName, ProfileStore.KEY_WIFI_RSSI), -45),
             telephonyEnabled = prefs.getBoolean(key(packageName, ProfileStore.KEY_TELEPHONY_ENABLED), false),
             mcc = prefs.getString(key(packageName, ProfileStore.KEY_MCC), "").orEmpty(),
             mnc = prefs.getString(key(packageName, ProfileStore.KEY_MNC), "").orEmpty(),
             operatorName = prefs.getString(key(packageName, ProfileStore.KEY_OPERATOR_NAME), "").orEmpty(),
+            cellRadio = prefs.getString(key(packageName, ProfileStore.KEY_CELL_RADIO), "").orEmpty(),
+            cellAreaCode = prefs.getLong(key(packageName, ProfileStore.KEY_CELL_AREA_CODE), -1L),
+            cellId = prefs.getLong(key(packageName, ProfileStore.KEY_CELL_ID), -1L),
             radioSource = prefs.getString(key(packageName, ProfileStore.KEY_RADIO_SOURCE), "").orEmpty(),
             lastSyncIp = prefs.getString(key(packageName, ProfileStore.KEY_LAST_SYNC_IP), "").orEmpty(),
             lastSyncCity = prefs.getString(key(packageName, ProfileStore.KEY_LAST_SYNC_CITY), "").orEmpty(),
@@ -99,10 +103,14 @@ object ProfileStoreV2 {
             .putBoolean(key(packageName, ProfileStore.KEY_WIFI_ENABLED), profile.wifiEnabled)
             .putString(key(packageName, ProfileStore.KEY_WIFI_SSID), profile.wifiSsid)
             .putString(key(packageName, ProfileStore.KEY_WIFI_BSSID), profile.wifiBssid.lowercase())
+            .putInt(key(packageName, ProfileStore.KEY_WIFI_RSSI), profile.wifiRssiDbm)
             .putBoolean(key(packageName, ProfileStore.KEY_TELEPHONY_ENABLED), profile.telephonyEnabled)
             .putString(key(packageName, ProfileStore.KEY_MCC), profile.mcc)
             .putString(key(packageName, ProfileStore.KEY_MNC), profile.mnc)
             .putString(key(packageName, ProfileStore.KEY_OPERATOR_NAME), profile.operatorName)
+            .putString(key(packageName, ProfileStore.KEY_CELL_RADIO), profile.cellRadio)
+            .putLong(key(packageName, ProfileStore.KEY_CELL_AREA_CODE), profile.cellAreaCode)
+            .putLong(key(packageName, ProfileStore.KEY_CELL_ID), profile.cellId)
             .putString(key(packageName, ProfileStore.KEY_RADIO_SOURCE), profile.radioSource)
             .putString(key(packageName, ProfileStore.KEY_LAST_SYNC_IP), profile.lastSyncIp)
             .putString(key(packageName, ProfileStore.KEY_LAST_SYNC_CITY), profile.lastSyncCity)
@@ -123,8 +131,10 @@ object ProfileStoreV2 {
             ProfileStore.KEY_LOCATION_ENABLED, ProfileStore.KEY_LATITUDE, ProfileStore.KEY_LONGITUDE,
             ProfileStore.KEY_GEOCODER_ENABLED,
             ProfileStore.KEY_WIFI_ENABLED, ProfileStore.KEY_WIFI_SSID, ProfileStore.KEY_WIFI_BSSID,
+            ProfileStore.KEY_WIFI_RSSI,
             ProfileStore.KEY_TELEPHONY_ENABLED, ProfileStore.KEY_MCC, ProfileStore.KEY_MNC,
-            ProfileStore.KEY_OPERATOR_NAME, ProfileStore.KEY_RADIO_SOURCE,
+            ProfileStore.KEY_OPERATOR_NAME, ProfileStore.KEY_CELL_RADIO, ProfileStore.KEY_CELL_AREA_CODE,
+            ProfileStore.KEY_CELL_ID, ProfileStore.KEY_RADIO_SOURCE,
             ProfileStore.KEY_LAST_SYNC_IP, ProfileStore.KEY_LAST_SYNC_CITY,
             ProfileStore.KEY_LAST_SYNC_REGION, ProfileStore.KEY_LAST_SYNC_AT,
         )
