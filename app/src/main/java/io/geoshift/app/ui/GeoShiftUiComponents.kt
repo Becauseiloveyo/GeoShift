@@ -1,7 +1,11 @@
 package io.geoshift.app.ui
 
-import android.widget.ImageView
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
+import android.util.LruCache
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,17 +31,35 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+private object AppIconBitmapCache {
+    private val cache = object : LruCache<String, Bitmap>(4 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap): Int = (value.byteCount / 1024).coerceAtLeast(1)
+    }
+
+    @Synchronized
+    fun get(packageName: String): Bitmap? = cache.get(packageName)
+
+    @Synchronized
+    fun put(packageName: String, bitmap: Bitmap) {
+        cache.put(packageName, bitmap)
+    }
+}
 
 @Composable
 internal fun Symbol(
@@ -160,12 +182,20 @@ internal fun AppAvatar(label: String) {
 
 @Composable
 internal fun AppIcon(packageName: String, label: String) {
-    val context = LocalContext.current
-    val drawable = remember(context, packageName) {
-        runCatching { context.packageManager.getApplicationIcon(packageName) }.getOrNull()
+    val appContext = LocalContext.current.applicationContext
+    val bitmap by produceState<Bitmap?>(initialValue = AppIconBitmapCache.get(packageName), packageName) {
+        if (value != null) return@produceState
+        value = withContext(Dispatchers.IO) {
+            AppIconBitmapCache.get(packageName) ?: runCatching {
+                appContext.packageManager
+                    .getApplicationIcon(packageName)
+                    .renderToBitmap(sizePx = 96)
+                    .also { AppIconBitmapCache.put(packageName, it) }
+            }.getOrNull()
+        }
     }
 
-    if (drawable == null) {
+    if (bitmap == null) {
         AppAvatar(label)
         return
     }
@@ -175,17 +205,23 @@ internal fun AppIcon(packageName: String, label: String) {
         shape = RoundedCornerShape(14.dp),
         color = Color.Transparent,
     ) {
-        AndroidView(
-            factory = { viewContext ->
-                ImageView(viewContext).apply {
-                    scaleType = ImageView.ScaleType.FIT_CENTER
-                    setImageDrawable(drawable)
-                }
-            },
-            update = { it.setImageDrawable(drawable) },
+        Image(
+            bitmap = bitmap!!.asImageBitmap(),
+            contentDescription = label,
+            contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize().padding(2.dp),
         )
     }
+}
+
+private fun Drawable.renderToBitmap(sizePx: Int): Bitmap {
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val oldBounds = bounds
+    setBounds(0, 0, sizePx, sizePx)
+    draw(canvas)
+    bounds = oldBounds
+    return bitmap
 }
 
 internal fun appLabel(packageName: String, apps: List<AppChoice>): String =
