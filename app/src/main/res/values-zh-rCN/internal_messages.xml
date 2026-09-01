@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="could_not_open_export">无法打开导出位置</string>
+    <string name="could_not_read_profile">无法读取配置文件</string>
+    <string name="could_not_save_profile">无法保存配置</string>
+    <string name="could_not_update_profile">无法更新配置</string>
+    <string name="could_not_save_synced_profile">无法保存同步后的配置</string>
+    <string name="could_not_save_radio">无法保存无线环境建议</string>
+</resources>
