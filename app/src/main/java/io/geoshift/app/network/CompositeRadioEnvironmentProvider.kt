@@ -1,5 +1,6 @@
 package io.geoshift.app.network
 
+import java.io.IOException
 import kotlin.math.roundToInt
 
 class CompositeRadioEnvironmentProvider(
@@ -23,6 +24,7 @@ class CompositeRadioEnvironmentProvider(
 class CachingRadioEnvironmentProvider(
     private val delegate: RadioEnvironmentProvider,
     private val ttlMs: Long = 10 * 60 * 1000L,
+    private val maxAttempts: Int = 3,
 ) : RadioEnvironmentProvider {
     private data class Key(val latBucket: Int, val lonBucket: Int, val radius: Int, val kind: String)
     private data class Entry<T>(val createdAt: Long, val value: T)
@@ -52,8 +54,36 @@ class CachingRadioEnvironmentProvider(
             val current = cache[key]
             if (current != null && now - current.createdAt <= ttlMs) return current.value as T
         }
-        val loaded = loader()
+
+        val loaded = loadWithRetry(loader)
         synchronized(cache) { cache[key] = Entry(System.currentTimeMillis(), loaded) }
         return loaded
+    }
+
+    private fun <T> loadWithRetry(loader: () -> T): T {
+        var lastError: Throwable? = null
+        repeat(maxAttempts.coerceAtLeast(1)) { attempt ->
+            try {
+                return loader()
+            } catch (error: Throwable) {
+                lastError = error
+                if (!isRetryable(error) || attempt >= maxAttempts - 1) throw error
+                try {
+                    Thread.sleep(250L * (1L shl attempt.coerceAtMost(3)))
+                } catch (interrupted: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw error
+                }
+            }
+        }
+        throw lastError ?: IllegalStateException("Radio provider request failed")
+    }
+
+    private fun isRetryable(error: Throwable): Boolean {
+        if (error is IOException) return true
+        val message = error.message.orEmpty()
+        val status = Regex("HTTP\\s+(\\d{3})", RegexOption.IGNORE_CASE)
+            .find(message)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        return status == 429 || status != null && status in 500..599
     }
 }
