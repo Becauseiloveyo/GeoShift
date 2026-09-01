@@ -92,6 +92,10 @@ internal fun ProfileEditorScreen(
     val countryError = validationErrors.firstOrNull { it.startsWith("Country code") }
     val latitudeError = validationErrors.firstOrNull { it.startsWith("Latitude") }
     val longitudeError = validationErrors.firstOrNull { it.startsWith("Longitude") }
+    val bssidError = validationErrors.firstOrNull { it.startsWith("Wi-Fi BSSID") }
+    val mccError = validationErrors.firstOrNull { it.startsWith("MCC") }
+    val mncError = validationErrors.firstOrNull { it.startsWith("MNC") }
+    val operatorPairError = validationErrors.firstOrNull { it.startsWith("MCC and MNC") }
 
     fun requestClose() {
         if (hasChanges) confirmDiscard = true else onBack()
@@ -119,10 +123,7 @@ internal fun ProfileEditorScreen(
         },
         bottomBar = {
             Surface(tonalElevation = 3.dp, modifier = Modifier.imePadding()) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Column(
                         modifier = Modifier.adaptiveContentWidth().padding(horizontal = 20.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(7.dp),
@@ -143,18 +144,13 @@ internal fun ProfileEditorScreen(
                             onClick = { onSave(draft, originalPackage) },
                             enabled = serviceConnected && validationErrors.isEmpty(),
                             modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Save profile")
-                        }
+                        ) { Text("Save profile") }
                     }
                 }
             }
         },
     ) { padding ->
-        Box(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentAlignment = Alignment.TopCenter,
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
                 modifier = Modifier.fillMaxHeight().adaptiveContentWidth(),
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
@@ -218,9 +214,7 @@ internal fun ProfileEditorScreen(
                             onClick = { onSync(draft) },
                             enabled = serviceConnected && !isSyncing && draft.targetPackage.isNotBlank() && !packageConflict,
                             modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(if (isSyncing) "Synchronizing…" else "Sync this profile now")
-                        }
+                        ) { Text(if (isSyncing) "Synchronizing…" else "Sync this profile now") }
                     }
                 }
                 item {
@@ -286,9 +280,89 @@ internal fun ProfileEditorScreen(
                     }
                 }
                 item {
+                    SectionCard(title = "Radio identity", iconRes = R.drawable.ms_wifi_24) {
+                        SwitchSetting(
+                            "Wi-Fi identity",
+                            "Override the current SSID/BSSID for this app.",
+                            draft.wifiEnabled,
+                        ) { draft = draft.copy(wifiEnabled = it) }
+                        if (draft.wifiEnabled) {
+                            OutlinedTextField(
+                                value = draft.wifiSsid,
+                                onValueChange = { draft = draft.copy(wifiSsid = it) },
+                                label = { Text("SSID") },
+                                placeholder = { Text("Nearby network") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            OutlinedTextField(
+                                value = draft.wifiBssid,
+                                onValueChange = { draft = draft.copy(wifiBssid = it.trim().lowercase()) },
+                                label = { Text("BSSID") },
+                                placeholder = { Text("aa:bb:cc:dd:ee:ff") },
+                                singleLine = true,
+                                isError = bssidError != null,
+                                supportingText = bssidError?.let { message -> { Text(message) } },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        HorizontalDivider()
+                        SwitchSetting(
+                            "Telephony identity",
+                            "Override country, MCC/MNC and operator name where supported.",
+                            draft.telephonyEnabled,
+                        ) { draft = draft.copy(telephonyEnabled = it) }
+                        if (draft.telephonyEnabled) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OutlinedTextField(
+                                    value = draft.mcc,
+                                    onValueChange = { draft = draft.copy(mcc = it.filter(Char::isDigit).take(3)) },
+                                    label = { Text("MCC") },
+                                    placeholder = { Text("310") },
+                                    singleLine = true,
+                                    isError = mccError != null || operatorPairError != null,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f),
+                                )
+                                OutlinedTextField(
+                                    value = draft.mnc,
+                                    onValueChange = { draft = draft.copy(mnc = it.filter(Char::isDigit).take(3)) },
+                                    label = { Text("MNC") },
+                                    placeholder = { Text("260") },
+                                    singleLine = true,
+                                    isError = mncError != null || operatorPairError != null,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            if (operatorPairError != null) {
+                                Text(operatorPairError, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            }
+                            OutlinedTextField(
+                                value = draft.operatorName,
+                                onValueChange = { draft = draft.copy(operatorName = it) },
+                                label = { Text("Operator name (optional)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        if (draft.radioSource.isNotBlank()) {
+                            Text(
+                                "Source: ${draft.radioSource}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                item {
                     SectionCard(title = "Overrides", iconRes = R.drawable.ms_settings_24) {
                         SwitchSetting("Location", "Use the profile coordinates where supported.", draft.locationEnabled) {
                             draft = draft.copy(locationEnabled = it)
+                        }
+                        HorizontalDivider()
+                        SwitchSetting("Geocoder", "Return the profile city, region and country for its coordinates.", draft.geocoderEnabled) {
+                            draft = draft.copy(geocoderEnabled = it)
                         }
                         HorizontalDivider()
                         SwitchSetting("Time zone", "Use the profile time zone where supported.", draft.timezoneEnabled) {
