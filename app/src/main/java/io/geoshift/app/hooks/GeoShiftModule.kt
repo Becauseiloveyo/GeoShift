@@ -1,12 +1,16 @@
 package io.geoshift.app.hooks
 
 import android.location.Location
+import android.os.LocaleList
 import android.util.Log
-import io.geoshift.app.core.ProfileStore
+import io.geoshift.app.core.GeoProfile
+import io.geoshift.app.core.ProfileStoreV2
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
+import java.time.ZoneId
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.atomic.AtomicReference
 
 class GeoShiftModule : XposedModule() {
     companion object {
@@ -17,38 +21,43 @@ class GeoShiftModule : XposedModule() {
     override fun onPackageReady(param: PackageReadyParam) {
         if (!param.isFirstPackage) return
 
-        val prefs = getRemotePreferences(ProfileStore.REMOTE_PREFS)
-        val targetAtInstall = prefs.getString(ProfileStore.KEY_TARGET_PACKAGE, "").orEmpty()
-        if (targetAtInstall.isBlank() || targetAtInstall != param.packageName) return
-
-        fun profileActive(): Boolean {
-            if (!prefs.getBoolean(ProfileStore.KEY_ENABLED, true)) return false
-            return prefs.getString(ProfileStore.KEY_TARGET_PACKAGE, "").orEmpty() == param.packageName
+        val prefs = getRemotePreferences(ProfileStoreV2.REMOTE_PREFS)
+        val profile = AtomicReference(ProfileStoreV2.load(prefs, param.packageName))
+        val prefix = ProfileStoreV2.prefixFor(param.packageName)
+        prefs.registerOnSharedPreferenceChangeListener { changedPrefs, key ->
+            if (key == null || key.startsWith(prefix)) {
+                profile.set(ProfileStoreV2.load(changedPrefs, param.packageName))
+            }
         }
 
-        log(Log.INFO, TAG, "Installing dynamic profile hooks for ${param.packageName}")
+        log(Log.INFO, TAG, "Installing reactive profile hooks for ${param.packageName}")
 
         runCatching {
-            val method = TimeZone::class.java.getDeclaredMethod("getDefault")
-            hook(method).intercept { chain ->
-                if (!profileActive() || !prefs.getBoolean(ProfileStore.KEY_TIMEZONE_ENABLED, true)) {
-                    chain.proceed()
-                } else {
-                    val id = prefs.getString(ProfileStore.KEY_TIMEZONE, "").orEmpty()
-                    if (id !in TIMEZONE_IDS) chain.proceed() else TimeZone.getTimeZone(id)
-                }
+            hook(TimeZone::class.java.getDeclaredMethod("getDefault")).intercept { chain ->
+                val current = profile.get()
+                if (!current.isTimezoneActive()) chain.proceed()
+                else TimeZone.getTimeZone(current!!.timezoneId)
             }
-        }.onFailure { log(Log.WARN, TAG, "TimeZone hook failed", it) }
+
+            hook(ZoneId::class.java.getDeclaredMethod("systemDefault")).intercept { chain ->
+                val current = profile.get()
+                if (!current.isTimezoneActive()) chain.proceed()
+                else runCatching { ZoneId.of(current!!.timezoneId) }.getOrElse { chain.proceed() }
+            }
+        }.onFailure { log(Log.WARN, TAG, "Time zone hook failed", it) }
 
         runCatching {
-            val noArg = Locale::class.java.getDeclaredMethod("getDefault")
-            hook(noArg).intercept { chain ->
-                localeOrOriginal(prefs, profileActive(), chain::proceed)
+            hook(Locale::class.java.getDeclaredMethod("getDefault")).intercept { chain ->
+                localeOrOriginal(profile.get(), chain::proceed)
             }
-
-            val category = Locale::class.java.getDeclaredMethod("getDefault", Locale.Category::class.java)
-            hook(category).intercept { chain ->
-                localeOrOriginal(prefs, profileActive(), chain::proceed)
+            hook(Locale::class.java.getDeclaredMethod("getDefault", Locale.Category::class.java)).intercept { chain ->
+                localeOrOriginal(profile.get(), chain::proceed)
+            }
+            hook(LocaleList::class.java.getDeclaredMethod("getDefault")).intercept { chain ->
+                localeListOrOriginal(profile.get(), chain::proceed)
+            }
+            hook(LocaleList::class.java.getDeclaredMethod("getAdjustedDefault")).intercept { chain ->
+                localeListOrOriginal(profile.get(), chain::proceed)
             }
         }.onFailure { log(Log.WARN, TAG, "Locale hook failed", it) }
 
@@ -57,32 +66,36 @@ class GeoShiftModule : XposedModule() {
             val getLongitude = Location::class.java.getDeclaredMethod("getLongitude")
 
             hook(getLatitude).intercept { chain ->
-                if (!profileActive() || !prefs.getBoolean(ProfileStore.KEY_LOCATION_ENABLED, true)) {
-                    chain.proceed()
-                } else {
-                    val value = prefs.getString(ProfileStore.KEY_LATITUDE, null)?.toDoubleOrNull()
-                    if (value == null || !value.isFinite() || value !in -90.0..90.0) chain.proceed() else value
-                }
+                val current = profile.get()
+                if (!current.isLocationActive() || current!!.latitude !in -90.0..90.0) chain.proceed()
+                else current.latitude
             }
             hook(getLongitude).intercept { chain ->
-                if (!profileActive() || !prefs.getBoolean(ProfileStore.KEY_LOCATION_ENABLED, true)) {
-                    chain.proceed()
-                } else {
-                    val value = prefs.getString(ProfileStore.KEY_LONGITUDE, null)?.toDoubleOrNull()
-                    if (value == null || !value.isFinite() || value !in -180.0..180.0) chain.proceed() else value
-                }
+                val current = profile.get()
+                if (!current.isLocationActive() || current!!.longitude !in -180.0..180.0) chain.proceed()
+                else current.longitude
             }
         }.onFailure { log(Log.WARN, TAG, "Location hook failed", it) }
     }
 
-    private fun localeOrOriginal(
-        prefs: android.content.SharedPreferences,
-        active: Boolean,
-        original: () -> Any?,
-    ): Any? {
-        if (!active || !prefs.getBoolean(ProfileStore.KEY_LOCALE_ENABLED, true)) return original()
-        val tag = prefs.getString(ProfileStore.KEY_LOCALE, "").orEmpty()
-        val locale = Locale.forLanguageTag(tag)
-        return if (tag.isBlank() || locale.language.isBlank()) original() else locale
+    private fun GeoProfile?.isTimezoneActive(): Boolean =
+        this != null && enabled && timezoneEnabled && timezoneId in TIMEZONE_IDS
+
+    private fun GeoProfile?.isLocaleActive(): Boolean =
+        this != null && enabled && localeEnabled && localeTag.isNotBlank()
+
+    private fun GeoProfile?.isLocationActive(): Boolean =
+        this != null && enabled && locationEnabled && latitude.isFinite() && longitude.isFinite()
+
+    private fun localeOrOriginal(current: GeoProfile?, original: () -> Any?): Any? {
+        if (!current.isLocaleActive()) return original()
+        val locale = Locale.forLanguageTag(current!!.localeTag)
+        return if (locale.language.isBlank()) original() else locale
+    }
+
+    private fun localeListOrOriginal(current: GeoProfile?, original: () -> Any?): Any? {
+        if (!current.isLocaleActive()) return original()
+        val locale = Locale.forLanguageTag(current!!.localeTag)
+        return if (locale.language.isBlank()) original() else LocaleList(locale)
     }
 }
