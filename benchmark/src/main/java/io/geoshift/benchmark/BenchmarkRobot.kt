@@ -3,11 +3,10 @@ package io.geoshift.benchmark
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
 
 internal const val TARGET_PACKAGE = "io.geoshift.app"
 private const val UI_TIMEOUT_MS = 5_000L
-private const val STEP_TIMEOUT_MS = 1_500L
+private const val POLL_MS = 50L
 
 internal fun UiDevice.resetGeoShiftData() {
     executeShellCommand("pm clear $TARGET_PACKAGE")
@@ -47,7 +46,7 @@ private fun UiDevice.waitForAny(vararg selectors: BySelector): Boolean {
     val deadline = System.currentTimeMillis() + UI_TIMEOUT_MS
     while (System.currentTimeMillis() < deadline) {
         if (selectors.any { hasObject(it) }) return true
-        Thread.sleep(50)
+        Thread.sleep(POLL_MS)
     }
     return false
 }
@@ -59,11 +58,10 @@ private fun UiDevice.clickLowest(vararg selectors: BySelector): Boolean {
         val target = candidates.maxByOrNull { it.visibleBounds.bottom }
         if (target != null) {
             target.click()
-            wait(Until.gone(By.focused(true)), 50)
             waitForIdle()
             return true
         }
-        Thread.sleep(STEP_TIMEOUT_MS.coerceAtMost(100))
+        Thread.sleep(POLL_MS)
     }
     return false
 }
