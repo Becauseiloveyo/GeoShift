@@ -18,6 +18,7 @@ import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.ProfileCodec
 import io.geoshift.app.core.ProfileStoreV2
 import io.geoshift.app.core.ProviderSettings
+import io.geoshift.app.core.WifiAccessPointProfile
 import io.geoshift.app.network.CachingRadioEnvironmentProvider
 import io.geoshift.app.network.CompositeRadioEnvironmentProvider
 import io.geoshift.app.network.GeoProfileSynchronizer
@@ -381,18 +382,34 @@ class MainActivity : ComponentActivity() {
                     val nearestWifi = wifi.firstOrNull()
                     val nearestCell = cells.firstOrNull()
                     if (nearestWifi == null && nearestCell == null) error(getString(R.string.no_radio_records))
-                    val source = listOfNotNull(nearestWifi?.source, nearestCell?.source)
+
+                    val accessPoints = wifi.take(GeoProfile.MAX_WIFI_ACCESS_POINTS).map { item ->
+                        WifiAccessPointProfile(
+                            ssid = item.ssid.orEmpty(),
+                            bssid = item.bssid.lowercase(),
+                            rssiDbm = item.estimatedRssiDbm ?: -55,
+                            frequencyMhz = 5200,
+                        )
+                    }.filter { it.isValid() }
+                    val primaryWifi = accessPoints.firstOrNull()
+                    val source = (wifi.take(GeoProfile.MAX_WIFI_ACCESS_POINTS).map { it.source } + listOfNotNull(nearestCell?.source))
                         .filter { it.isNotBlank() }
                         .distinct()
                         .joinToString(" + ")
+
                     val updated = profile.copy(
-                        wifiEnabled = nearestWifi != null,
-                        wifiSsid = nearestWifi?.ssid.orEmpty(),
-                        wifiBssid = nearestWifi?.bssid.orEmpty(),
-                        telephonyEnabled = nearestCell != null,
-                        mcc = nearestCell?.mcc?.toString()?.padStart(3, '0').orEmpty(),
-                        mnc = nearestCell?.mnc?.toString()?.padStart(2, '0').orEmpty(),
-                        radioSource = source.ifBlank { getString(R.string.provider_suggestion) },
+                        wifiEnabled = if (primaryWifi != null) true else profile.wifiEnabled,
+                        wifiSsid = primaryWifi?.ssid ?: profile.wifiSsid,
+                        wifiBssid = primaryWifi?.bssid ?: profile.wifiBssid,
+                        wifiRssiDbm = primaryWifi?.rssiDbm ?: profile.wifiRssiDbm,
+                        wifiAccessPoints = if (accessPoints.isNotEmpty()) accessPoints else profile.wifiAccessPoints,
+                        telephonyEnabled = if (nearestCell != null) true else profile.telephonyEnabled,
+                        mcc = nearestCell?.mcc?.toString()?.padStart(3, '0') ?: profile.mcc,
+                        mnc = nearestCell?.mnc?.toString()?.padStart(2, '0') ?: profile.mnc,
+                        cellRadio = nearestCell?.radio ?: profile.cellRadio,
+                        cellAreaCode = nearestCell?.areaCode ?: profile.cellAreaCode,
+                        cellId = nearestCell?.cellId ?: profile.cellId,
+                        radioSource = source.ifBlank { profile.radioSource.ifBlank { getString(R.string.provider_suggestion) } },
                     )
                     val errors = updated.validate()
                     if (errors.isNotEmpty()) error(localizedProfileError(errors.first()))
