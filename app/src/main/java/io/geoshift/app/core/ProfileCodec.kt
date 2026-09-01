@@ -3,7 +3,7 @@ package io.geoshift.app.core
 import org.json.JSONObject
 
 object ProfileCodec {
-    private const val SCHEMA_VERSION = 2
+    private const val SCHEMA_VERSION = 3
 
     fun encode(profile: GeoProfile): String = JSONObject().apply {
         put("schemaVersion", SCHEMA_VERSION)
@@ -23,10 +23,14 @@ object ProfileCodec {
             put("wifiEnabled", profile.wifiEnabled)
             put("wifiSsid", profile.wifiSsid)
             put("wifiBssid", profile.wifiBssid)
+            put("wifiRssiDbm", profile.wifiRssiDbm)
             put("telephonyEnabled", profile.telephonyEnabled)
             put("mcc", profile.mcc)
             put("mnc", profile.mnc)
             put("operatorName", profile.operatorName)
+            put("cellRadio", profile.cellRadio)
+            put("cellAreaCode", profile.cellAreaCode)
+            put("cellId", profile.cellId)
             put("radioSource", profile.radioSource)
             put("lastSyncIp", profile.lastSyncIp)
             put("lastSyncCity", profile.lastSyncCity)
@@ -56,10 +60,14 @@ object ProfileCodec {
             wifiEnabled = json.optBoolean("wifiEnabled", false),
             wifiSsid = json.optString("wifiSsid", ""),
             wifiBssid = json.optString("wifiBssid", ""),
+            wifiRssiDbm = json.optInt("wifiRssiDbm", -45),
             telephonyEnabled = json.optBoolean("telephonyEnabled", false),
             mcc = json.optString("mcc", ""),
             mnc = json.optString("mnc", ""),
             operatorName = json.optString("operatorName", ""),
+            cellRadio = json.optString("cellRadio", ""),
+            cellAreaCode = json.optLong("cellAreaCode", -1L),
+            cellId = json.optLong("cellId", -1L),
             radioSource = json.optString("radioSource", ""),
             lastSyncIp = json.optString("lastSyncIp", ""),
             lastSyncCity = json.optString("lastSyncCity", ""),
