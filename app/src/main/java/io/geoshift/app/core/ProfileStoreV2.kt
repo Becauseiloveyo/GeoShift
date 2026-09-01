@@ -59,6 +59,9 @@ object ProfileStoreV2 {
             wifiSsid = prefs.getString(key(packageName, ProfileStore.KEY_WIFI_SSID), "").orEmpty(),
             wifiBssid = prefs.getString(key(packageName, ProfileStore.KEY_WIFI_BSSID), "").orEmpty(),
             wifiRssiDbm = prefs.getInt(key(packageName, ProfileStore.KEY_WIFI_RSSI), -45),
+            wifiAccessPoints = WifiAccessPointCodec.decode(
+                prefs.getString(key(packageName, ProfileStore.KEY_WIFI_ACCESS_POINTS), null)
+            ),
             telephonyEnabled = prefs.getBoolean(key(packageName, ProfileStore.KEY_TELEPHONY_ENABLED), false),
             mcc = prefs.getString(key(packageName, ProfileStore.KEY_MCC), "").orEmpty(),
             mnc = prefs.getString(key(packageName, ProfileStore.KEY_MNC), "").orEmpty(),
@@ -104,6 +107,10 @@ object ProfileStoreV2 {
             .putString(key(packageName, ProfileStore.KEY_WIFI_SSID), profile.wifiSsid)
             .putString(key(packageName, ProfileStore.KEY_WIFI_BSSID), profile.wifiBssid.lowercase())
             .putInt(key(packageName, ProfileStore.KEY_WIFI_RSSI), profile.wifiRssiDbm)
+            .putString(
+                key(packageName, ProfileStore.KEY_WIFI_ACCESS_POINTS),
+                WifiAccessPointCodec.encode(profile.wifiAccessPoints)
+            )
             .putBoolean(key(packageName, ProfileStore.KEY_TELEPHONY_ENABLED), profile.telephonyEnabled)
             .putString(key(packageName, ProfileStore.KEY_MCC), profile.mcc)
             .putString(key(packageName, ProfileStore.KEY_MNC), profile.mnc)
@@ -131,7 +138,7 @@ object ProfileStoreV2 {
             ProfileStore.KEY_LOCATION_ENABLED, ProfileStore.KEY_LATITUDE, ProfileStore.KEY_LONGITUDE,
             ProfileStore.KEY_GEOCODER_ENABLED,
             ProfileStore.KEY_WIFI_ENABLED, ProfileStore.KEY_WIFI_SSID, ProfileStore.KEY_WIFI_BSSID,
-            ProfileStore.KEY_WIFI_RSSI,
+            ProfileStore.KEY_WIFI_RSSI, ProfileStore.KEY_WIFI_ACCESS_POINTS,
             ProfileStore.KEY_TELEPHONY_ENABLED, ProfileStore.KEY_MCC, ProfileStore.KEY_MNC,
             ProfileStore.KEY_OPERATOR_NAME, ProfileStore.KEY_CELL_RADIO, ProfileStore.KEY_CELL_AREA_CODE,
             ProfileStore.KEY_CELL_ID, ProfileStore.KEY_RADIO_SOURCE,
