@@ -12,7 +12,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import io.geoshift.app.core.ProfileStore
+import io.geoshift.app.core.ProfileStoreV2
 import io.geoshift.app.network.GeoProfileSynchronizer
 import io.geoshift.app.network.VpnDetector
 import io.github.libxposed.service.XposedService
@@ -73,8 +73,8 @@ class VpnFollowService : Service() {
             updateNotification("Waiting for LSPosed service")
             return
         }
-        val profile = ProfileStore.load(service)
-        if (!profile.enabled || !profile.followVpn) {
+        val profiles = ProfileStoreV2.list(service).filter { it.enabled && it.followVpn }
+        if (profiles.isEmpty()) {
             stopSelf()
             return
         }
@@ -86,20 +86,20 @@ class VpnFollowService : Service() {
 
         executor.execute {
             try {
-                val outcome = synchronizer.synchronize(profile)
-                val errors = outcome.profile.validate()
-                if (errors.isNotEmpty()) {
-                    updateNotification("Sync rejected: ${errors.first()}")
-                    return@execute
+                // Resolve the public exit exactly once so every followed app receives
+                // one coherent geographic snapshot for this network transition.
+                val geoIp = synchronizer.resolveCurrentExit()
+                val now = System.currentTimeMillis()
+                var saved = 0
+                for (profile in profiles) {
+                    val outcome = synchronizer.synchronize(profile, geoIp, now)
+                    val errors = outcome.profile.validate()
+                    if (errors.isEmpty() && ProfileStoreV2.save(service, outcome.profile)) saved++
                 }
-                if (ProfileStore.save(service, outcome.profile)) {
-                    val place = listOf(outcome.geoIp.city, outcome.geoIp.countryCode)
-                        .filter { it.isNotBlank() }
-                        .joinToString(", ")
-                    updateNotification("Exit ${outcome.geoIp.ip} · $place")
-                } else {
-                    updateNotification("Could not save synchronized profile")
-                }
+                val place = listOf(geoIp.city, geoIp.countryCode)
+                    .filter { it.isNotBlank() }
+                    .joinToString(", ")
+                updateNotification("Synced $saved/${profiles.size} profiles · ${geoIp.ip} · $place")
             } catch (error: Throwable) {
                 updateNotification("GeoIP sync failed: ${error.message ?: error.javaClass.simpleName}")
             } finally {
