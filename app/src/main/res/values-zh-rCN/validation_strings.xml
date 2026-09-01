@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="error_invalid_timezone">时区无效或当前系统不支持。</string>
+    <string name="error_invalid_locale">语言区域标签无效。</string>
+    <string name="error_country_code">国家代码应为两个英文字母，例如 US 或 CN。</string>
+    <string name="error_invalid_bssid">BSSID 必须使用 MAC 地址格式，例如 aa:bb:cc:dd:ee:ff。</string>
+    <string name="error_invalid_mcc">MCC 必须为 3 位数字。</string>
+    <string name="error_invalid_mnc">MNC 必须为 2 或 3 位数字。</string>
+    <string name="error_mcc_mnc_pair">MCC 与 MNC 必须同时配置。</string>
+    <string name="severity_error">错误</string>
+    <string name="severity_warning">警告</string>
+    <string name="diag_locale_country">语言区域中的地区 %1$s 与国家 %2$s 不一致。</string>
+    <string name="diag_zero_location">当前位置为 0,0；请设置有效测试位置或通过 GeoIP 同步。</string>
+    <string name="diag_geocoder_location_off">已启用地址解析覆盖，但位置覆盖处于关闭状态。</string>
+    <string name="diag_wifi_empty">已启用 Wi-Fi 覆盖，但尚未配置 SSID/BSSID。</string>
+    <string name="diag_cell_empty">已启用蜂窝网络覆盖，但尚未配置 MCC/MNC。</string>
+    <string name="diag_radio_source_empty">无线环境没有记录数据来源，请确认它与所选位置一致。</string>
+    <string name="diag_follow_unsynced">已启用 Follow VPN，但还没有成功的出口 IP 同步记录。</string>
+    <string name="diag_follow_stale">上次出口 IP 同步已超过 24 小时。</string>
+    <string name="diag_generic">%1$s</string>
+</resources>
