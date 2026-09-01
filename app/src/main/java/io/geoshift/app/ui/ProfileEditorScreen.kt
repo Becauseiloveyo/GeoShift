@@ -24,6 +24,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -50,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import io.geoshift.app.R
 import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.ProfileDiagnostics
+import io.geoshift.app.core.ProfileHealth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collect
 
@@ -72,6 +74,10 @@ internal fun ProfileEditorScreen(
     var draft by remember(profile) { mutableStateOf(profile) }
     var latitudeText by remember(profile) { mutableStateOf(profile.latitude.toString()) }
     var longitudeText by remember(profile) { mutableStateOf(profile.longitude.toString()) }
+    var wifiRssiText by remember(profile) { mutableStateOf(profile.wifiRssiDbm.toString()) }
+    var cellAreaText by remember(profile) { mutableStateOf(profile.cellAreaCode.toString()) }
+    var cellIdText by remember(profile) { mutableStateOf(profile.cellId.toString()) }
+    var advancedMode by rememberSaveable { mutableStateOf(false) }
     var showAppPicker by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
@@ -79,9 +85,14 @@ internal fun ProfileEditorScreen(
     val coreErrors = draft.validate()
     val packageConflict = draft.targetPackage.isNotBlank() && draft.targetPackage in existingPackages
     val validationErrors = if (packageConflict) coreErrors + "A profile for this app already exists" else coreErrors
-    val diagnosticIssues = remember(draft) { ProfileDiagnostics.evaluate(draft) }
+    val health = remember(draft) { ProfileHealth.evaluate(draft) }
+    val diagnosticIssues = health.issues
     val hasChanges = draft != profile ||
-        latitudeText != profile.latitude.toString() || longitudeText != profile.longitude.toString()
+        latitudeText != profile.latitude.toString() ||
+        longitudeText != profile.longitude.toString() ||
+        wifiRssiText != profile.wifiRssiDbm.toString() ||
+        cellAreaText != profile.cellAreaCode.toString() ||
+        cellIdText != profile.cellId.toString()
 
     val packageError = when {
         draft.targetPackage.isBlank() -> stringResource(R.string.choose_app_error)
@@ -94,9 +105,12 @@ internal fun ProfileEditorScreen(
     val latitudeError = validationErrors.any { it.startsWith("Latitude") }
     val longitudeError = validationErrors.any { it.startsWith("Longitude") }
     val bssidError = validationErrors.any { it.startsWith("Wi-Fi BSSID") }
+    val wifiRssiError = validationErrors.any { it.startsWith("Wi-Fi RSSI") }
     val mccError = validationErrors.any { it.startsWith("MCC must") }
     val mncError = validationErrors.any { it.startsWith("MNC must") }
     val operatorPairError = validationErrors.any { it.startsWith("MCC and MNC") }
+    val cellAreaError = validationErrors.any { it.startsWith("Cell area code") }
+    val cellIdError = validationErrors.any { it.startsWith("Cell ID") }
 
     fun requestClose() {
         if (hasChanges) confirmDiscard = true else onBack()
@@ -201,6 +215,24 @@ internal fun ProfileEditorScreen(
                             checked = draft.enabled,
                             onCheckedChange = { draft = draft.copy(enabled = it) },
                         )
+                        HorizontalDivider()
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = !advancedMode,
+                                onClick = { advancedMode = false },
+                                label = { Text(stringResource(R.string.editor_mode_basic)) },
+                            )
+                            FilterChip(
+                                selected = advancedMode,
+                                onClick = { advancedMode = true },
+                                label = { Text(stringResource(R.string.editor_mode_advanced)) },
+                            )
+                        }
+                        Text(
+                            stringResource(R.string.editor_mode_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
                 item {
@@ -222,26 +254,28 @@ internal fun ProfileEditorScreen(
                 }
                 item {
                     SectionCard(title = stringResource(R.string.section_region_identity), iconRes = R.drawable.ms_location_on_24) {
-                        OutlinedTextField(
-                            value = draft.timezoneId,
-                            onValueChange = { draft = draft.copy(timezoneId = it.trim()) },
-                            label = { Text(stringResource(R.string.field_timezone)) },
-                            placeholder = { Text("America/Los_Angeles") },
-                            singleLine = true,
-                            isError = timezoneError,
-                            supportingText = if (timezoneError) ({ Text(stringResource(R.string.error_invalid_timezone)) }) else null,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedTextField(
-                            value = draft.localeTag,
-                            onValueChange = { draft = draft.copy(localeTag = it.trim()) },
-                            label = { Text(stringResource(R.string.field_locale)) },
-                            placeholder = { Text("en-US") },
-                            singleLine = true,
-                            isError = localeError,
-                            supportingText = if (localeError) ({ Text(stringResource(R.string.error_invalid_locale)) }) else null,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        if (advancedMode) {
+                            OutlinedTextField(
+                                value = draft.timezoneId,
+                                onValueChange = { draft = draft.copy(timezoneId = it.trim()) },
+                                label = { Text(stringResource(R.string.field_timezone)) },
+                                placeholder = { Text("America/Los_Angeles") },
+                                singleLine = true,
+                                isError = timezoneError,
+                                supportingText = if (timezoneError) ({ Text(stringResource(R.string.error_invalid_timezone)) }) else null,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            OutlinedTextField(
+                                value = draft.localeTag,
+                                onValueChange = { draft = draft.copy(localeTag = it.trim()) },
+                                label = { Text(stringResource(R.string.field_locale)) },
+                                placeholder = { Text("en-US") },
+                                singleLine = true,
+                                isError = localeError,
+                                supportingText = if (localeError) ({ Text(stringResource(R.string.error_invalid_locale)) }) else null,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                         OutlinedTextField(
                             value = draft.countryCode,
                             onValueChange = { draft = draft.copy(countryCode = it.trim().uppercase()) },
@@ -290,24 +324,44 @@ internal fun ProfileEditorScreen(
                             draft.wifiEnabled,
                         ) { draft = draft.copy(wifiEnabled = it) }
                         if (draft.wifiEnabled) {
-                            OutlinedTextField(
-                                value = draft.wifiSsid,
-                                onValueChange = { draft = draft.copy(wifiSsid = it) },
-                                label = { Text("SSID") },
-                                placeholder = { Text(stringResource(R.string.nearby_network)) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
+                            Text(
+                                stringResource(R.string.nearby_access_points_count, health.wifiAccessPointCount),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            OutlinedTextField(
-                                value = draft.wifiBssid,
-                                onValueChange = { draft = draft.copy(wifiBssid = it.trim().lowercase()) },
-                                label = { Text("BSSID") },
-                                placeholder = { Text("aa:bb:cc:dd:ee:ff") },
-                                singleLine = true,
-                                isError = bssidError,
-                                supportingText = if (bssidError) ({ Text(stringResource(R.string.error_invalid_bssid)) }) else null,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                            if (advancedMode) {
+                                OutlinedTextField(
+                                    value = draft.wifiSsid,
+                                    onValueChange = { draft = draft.copy(wifiSsid = it) },
+                                    label = { Text("SSID") },
+                                    placeholder = { Text(stringResource(R.string.nearby_network)) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                OutlinedTextField(
+                                    value = draft.wifiBssid,
+                                    onValueChange = { draft = draft.copy(wifiBssid = it.trim().lowercase()) },
+                                    label = { Text("BSSID") },
+                                    placeholder = { Text("aa:bb:cc:dd:ee:ff") },
+                                    singleLine = true,
+                                    isError = bssidError,
+                                    supportingText = if (bssidError) ({ Text(stringResource(R.string.error_invalid_bssid)) }) else null,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                OutlinedTextField(
+                                    value = wifiRssiText,
+                                    onValueChange = {
+                                        wifiRssiText = it
+                                        draft = draft.copy(wifiRssiDbm = it.toIntOrNull() ?: Int.MIN_VALUE)
+                                    },
+                                    label = { Text(stringResource(R.string.wifi_rssi)) },
+                                    singleLine = true,
+                                    isError = wifiRssiError,
+                                    supportingText = if (wifiRssiError) ({ Text("−127…0") }) else null,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                         HorizontalDivider()
                         SwitchSetting(
@@ -315,7 +369,7 @@ internal fun ProfileEditorScreen(
                             stringResource(R.string.telephony_identity_desc),
                             draft.telephonyEnabled,
                         ) { draft = draft.copy(telephonyEnabled = it) }
-                        if (draft.telephonyEnabled) {
+                        if (draft.telephonyEnabled && advancedMode) {
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 OutlinedTextField(
                                     value = draft.mcc,
@@ -354,6 +408,42 @@ internal fun ProfileEditorScreen(
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                            OutlinedTextField(
+                                value = draft.cellRadio,
+                                onValueChange = { draft = draft.copy(cellRadio = it.trim().lowercase()) },
+                                label = { Text(stringResource(R.string.cell_radio)) },
+                                placeholder = { Text("lte / nr / gsm / wcdma") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OutlinedTextField(
+                                    value = cellAreaText,
+                                    onValueChange = {
+                                        cellAreaText = it
+                                        draft = draft.copy(cellAreaCode = it.toLongOrNull() ?: Long.MIN_VALUE)
+                                    },
+                                    label = { Text(stringResource(R.string.cell_area_code)) },
+                                    singleLine = true,
+                                    isError = cellAreaError,
+                                    supportingText = if (cellAreaError) ({ Text("≥ −1") }) else null,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                                    modifier = Modifier.weight(1f),
+                                )
+                                OutlinedTextField(
+                                    value = cellIdText,
+                                    onValueChange = {
+                                        cellIdText = it
+                                        draft = draft.copy(cellId = it.toLongOrNull() ?: Long.MIN_VALUE)
+                                    },
+                                    label = { Text(stringResource(R.string.cell_id)) },
+                                    singleLine = true,
+                                    isError = cellIdError,
+                                    supportingText = if (cellIdError) ({ Text("≥ −1") }) else null,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
                         }
                         if (draft.radioSource.isNotBlank()) {
                             Text(
@@ -393,12 +483,40 @@ internal fun ProfileEditorScreen(
                 }
                 item {
                     SectionCard(
-                        title = stringResource(R.string.section_consistency),
-                        iconRes = if (diagnosticIssues.isEmpty()) R.drawable.ms_check_circle_24 else R.drawable.ms_warning_24,
+                        title = stringResource(R.string.profile_health),
+                        iconRes = if (health.score >= 85) R.drawable.ms_check_circle_24 else R.drawable.ms_warning_24,
                     ) {
-                        if (diagnosticIssues.isEmpty()) {
-                            Text(stringResource(R.string.no_profile_conflicts), style = MaterialTheme.typography.bodyMedium)
-                        } else {
+                        Text(
+                            stringResource(R.string.health_score, health.score),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        StatusLine(
+                            healthy = health.mapReady,
+                            text = stringResource(if (health.mapReady) R.string.health_map_ready else R.string.health_map_not_ready),
+                        )
+                        StatusLine(
+                            healthy = health.wifiReady,
+                            text = if (health.wifiReady && draft.wifiEnabled) {
+                                stringResource(R.string.health_wifi_ready, health.wifiAccessPointCount)
+                            } else if (!draft.wifiEnabled) {
+                                stringResource(R.string.optional)
+                            } else stringResource(R.string.health_wifi_not_ready),
+                        )
+                        StatusLine(
+                            healthy = health.cellularReady,
+                            text = when {
+                                !draft.telephonyEnabled -> stringResource(R.string.optional)
+                                health.detailedCellIdentity -> stringResource(R.string.health_cell_ready)
+                                else -> stringResource(R.string.health_cell_basic)
+                            },
+                        )
+                        Text(
+                            stringResource(R.string.compatibility_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (diagnosticIssues.isNotEmpty()) {
+                            HorizontalDivider()
                             diagnosticIssues.forEach { issue ->
                                 val severity = when (issue.severity) {
                                     ProfileDiagnostics.Severity.ERROR -> stringResource(R.string.severity_error)
@@ -476,6 +594,19 @@ internal fun ProfileEditorScreen(
 }
 
 @Composable
+private fun StatusLine(healthy: Boolean, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Symbol(
+            if (healthy) R.drawable.ms_check_circle_24 else R.drawable.ms_warning_24,
+            modifier = Modifier.width(20.dp),
+            tint = if (healthy) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
 private fun localizedDiagnostic(message: String): String {
     val localeMatch = Regex("Locale region (\\S+) differs from country (\\S+)").matchEntire(message)
     return when {
@@ -485,9 +616,13 @@ private fun localizedDiagnostic(message: String): String {
         message.startsWith("Latitude") -> "−90…90"
         message.startsWith("Longitude") -> "−180…180"
         message.startsWith("Wi-Fi BSSID") -> stringResource(R.string.error_invalid_bssid)
+        message.startsWith("Wi-Fi RSSI") -> "−127…0 dBm"
+        message.startsWith("Wi-Fi access-point list") -> stringResource(R.string.health_wifi_not_ready)
         message.startsWith("MCC must") -> stringResource(R.string.error_invalid_mcc)
         message.startsWith("MNC must") -> stringResource(R.string.error_invalid_mnc)
         message.startsWith("MCC and MNC") -> stringResource(R.string.error_mcc_mnc_pair)
+        message.startsWith("Cell area code") -> stringResource(R.string.cell_area_code)
+        message.startsWith("Cell ID") -> stringResource(R.string.cell_id)
         localeMatch != null -> stringResource(
             R.string.diag_locale_country,
             localeMatch.groupValues[1],
