@@ -16,6 +16,7 @@ data class GeoShiftUiState(
     val providerSettings: ProviderSettings.Snapshot = ProviderSettings.Snapshot(),
     val syncStatus: String = "No synchronization yet",
     val radioStatus: String = "Radio providers not configured",
+    val notice: String? = null,
     val isSyncing: Boolean = false,
     val isRadioBusy: Boolean = false,
     val editingProfile: GeoProfile? = null,
@@ -37,4 +38,6 @@ data class GeoShiftActions(
     val importProfile: () -> Unit,
     val saveProviders: (ProviderSettings.Snapshot) -> Unit,
     val previewRadio: () -> Unit,
+    val applyRadioSuggestion: () -> Unit,
+    val clearNotice: () -> Unit,
 )
