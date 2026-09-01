@@ -12,8 +12,8 @@ android {
         applicationId = "io.geoshift.app"
         minSdk = 29
         targetSdk = 37
-        versionCode = 6
-        versionName = "0.3.3-dev"
+        versionCode = 7
+        versionName = "0.3.4-dev"
     }
 
     buildFeatures {
@@ -24,6 +24,12 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        create("benchmark") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
         }
     }
 
@@ -50,6 +56,7 @@ dependencies {
 
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     testImplementation("junit:junit:4.13.2")
 }
