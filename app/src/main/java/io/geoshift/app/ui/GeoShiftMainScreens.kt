@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,6 +24,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +54,12 @@ import androidx.compose.ui.unit.dp
 import io.geoshift.app.R
 import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.ProviderSettings
+
+private enum class ProfileSort(val label: String) {
+    Recent("Recent"),
+    Name("Name"),
+    Enabled("Enabled"),
+}
 
 @Composable
 fun GeoShiftAppScreen(
@@ -123,52 +131,61 @@ private fun OverviewScreen(
     actions: GeoShiftActions,
     padding: PaddingValues,
 ) {
-    val latest = state.profiles.maxByOrNull { it.lastSyncAtEpochMs }
-    LazyColumn(
+    val recentProfiles = remember(state.profiles) {
+        state.profiles.sortedByDescending { it.lastSyncAtEpochMs }
+    }
+    val latest = recentProfiles.firstOrNull()
+
+    Box(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentAlignment = Alignment.TopCenter,
     ) {
-        item {
-            Column {
-                Text("GeoShift", style = MaterialTheme.typography.headlineLarge)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "One coherent geographic profile for each app.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        LazyColumn(
+            modifier = Modifier.fillMaxHeight().adaptiveContentWidth(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                Column {
+                    Text("GeoShift", style = MaterialTheme.typography.headlineLarge)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "One coherent geographic profile for each app.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            item { StatusHero(state, latest, actions.syncAll) }
+            item {
+                SectionTitle(
+                    title = "Profiles",
+                    action = if (state.profiles.isEmpty()) "Add" else "View all",
+                    onAction = {
+                        if (state.profiles.isEmpty()) actions.addProfile()
+                        else actions.navigate(Destination.Profiles)
+                    },
                 )
             }
-        }
-        item { StatusHero(state, latest, actions.syncAll) }
-        item {
-            SectionTitle(
-                title = "Profiles",
-                action = if (state.profiles.isEmpty()) "Add" else "View all",
-                onAction = {
-                    if (state.profiles.isEmpty()) actions.addProfile()
-                    else actions.navigate(Destination.Profiles)
-                },
-            )
-        }
-        if (state.profiles.isEmpty()) {
-            item { EmptyProfilesCard(actions.addProfile, actions.importProfile) }
-        } else {
-            items(state.profiles.take(3), key = { it.targetPackage }) { profile ->
-                ProfileCard(
-                    profile = profile,
-                    label = appLabel(profile.targetPackage, apps),
-                    onClick = { actions.editProfile(profile) },
-                    onToggle = { actions.toggleProfile(profile.copy(enabled = it)) },
+            if (state.profiles.isEmpty()) {
+                item { EmptyProfilesCard(actions.addProfile, actions.importProfile) }
+            } else {
+                items(recentProfiles.take(3), key = { it.targetPackage }) { profile ->
+                    ProfileCard(
+                        profile = profile,
+                        label = appLabel(profile.targetPackage, apps),
+                        onClick = { actions.editProfile(profile) },
+                        onToggle = { actions.toggleProfile(profile.copy(enabled = it)) },
+                    )
+                }
+            }
+            item {
+                ProviderSummaryCard(
+                    settings = state.providerSettings,
+                    radioStatus = state.radioStatus,
+                    onOpen = { actions.navigate(Destination.Providers) },
                 )
             }
-        }
-        item {
-            ProviderSummaryCard(
-                settings = state.providerSettings,
-                radioStatus = state.radioStatus,
-                onOpen = { actions.navigate(Destination.Providers) },
-            )
         }
     }
 }
@@ -304,40 +321,119 @@ private fun ProfilesScreen(
     actions: GeoShiftActions,
     padding: PaddingValues,
 ) {
-    LazyColumn(
+    var query by rememberSaveable { mutableStateOf("") }
+    var sortMode by rememberSaveable { mutableStateOf(ProfileSort.Recent.name) }
+    val selectedSort = ProfileSort.entries.firstOrNull { it.name == sortMode } ?: ProfileSort.Recent
+
+    val visibleProfiles = remember(state.profiles, apps, query, selectedSort) {
+        val filtered = state.profiles.filter { profile ->
+            val label = appLabel(profile.targetPackage, apps)
+            query.isBlank() ||
+                label.contains(query, ignoreCase = true) ||
+                profile.targetPackage.contains(query, ignoreCase = true) ||
+                profile.countryCode.contains(query, ignoreCase = true) ||
+                profile.timezoneId.contains(query, ignoreCase = true)
+        }
+        when (selectedSort) {
+            ProfileSort.Recent -> filtered.sortedByDescending { it.lastSyncAtEpochMs }
+            ProfileSort.Name -> filtered.sortedBy { appLabel(it.targetPackage, apps).lowercase() }
+            ProfileSort.Enabled -> filtered.sortedWith(
+                compareByDescending<GeoProfile> { it.enabled }
+                    .thenBy { appLabel(it.targetPackage, apps).lowercase() }
+            )
+        }
+    }
+
+    Box(
         modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentAlignment = Alignment.TopCenter,
     ) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Profiles", style = MaterialTheme.typography.headlineLarge)
-                    Text(
-                        "Independent settings, one shared VPN exit when Follow VPN is enabled.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        LazyColumn(
+            modifier = Modifier.fillMaxHeight().adaptiveContentWidth(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Profiles", style = MaterialTheme.typography.headlineLarge)
+                        Text(
+                            "Independent settings, one shared VPN exit when Follow VPN is enabled.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(onClick = actions.addProfile) {
+                        Symbol(R.drawable.ms_add_24, contentDescription = "Add profile")
+                    }
+                }
+            }
+
+            if (state.profiles.isEmpty()) {
+                item { EmptyProfilesCard(actions.addProfile, actions.importProfile) }
+            } else {
+                item {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        leadingIcon = { Symbol(R.drawable.ms_search_24) },
+                        placeholder = { Text("Search profiles") },
+                        supportingText = {
+                            Text("${visibleProfiles.size} of ${state.profiles.size} profiles")
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                IconButton(onClick = actions.addProfile) {
-                    Symbol(R.drawable.ms_add_24, contentDescription = "Add profile")
+                item {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ProfileSort.entries.forEach { mode ->
+                            FilterChip(
+                                selected = selectedSort == mode,
+                                onClick = { sortMode = mode.name },
+                                label = { Text(mode.label) },
+                            )
+                        }
+                    }
                 }
-            }
-        }
-        if (state.profiles.isEmpty()) {
-            item { EmptyProfilesCard(actions.addProfile, actions.importProfile) }
-        } else {
-            items(state.profiles, key = { it.targetPackage }) { profile ->
-                ProfileCard(
-                    profile = profile,
-                    label = appLabel(profile.targetPackage, apps),
-                    onClick = { actions.editProfile(profile) },
-                    onToggle = { actions.toggleProfile(profile.copy(enabled = it)) },
-                )
-            }
-            item {
-                OutlinedButton(onClick = actions.importProfile, modifier = Modifier.fillMaxWidth()) {
-                    Text("Import profile JSON")
+
+                if (visibleProfiles.isEmpty()) {
+                    item {
+                        Surface(
+                            shape = MaterialTheme.shapes.large,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text("No matching profiles", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "Try an app name, package, country code, or time zone.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    items(visibleProfiles, key = { it.targetPackage }) { profile ->
+                        ProfileCard(
+                            profile = profile,
+                            label = appLabel(profile.targetPackage, apps),
+                            onClick = { actions.editProfile(profile) },
+                            onToggle = { actions.toggleProfile(profile.copy(enabled = it)) },
+                        )
+                    }
+                }
+
+                item {
+                    OutlinedButton(onClick = actions.importProfile, modifier = Modifier.fillMaxWidth()) {
+                        Text("Import profile JSON")
+                    }
                 }
             }
         }
@@ -358,7 +454,7 @@ private fun ProfileCard(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AppAvatar(label)
+                AppIcon(profile.targetPackage, label)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -440,85 +536,90 @@ private fun ProvidersScreen(
     var wigleToken by remember(state.providerSettings) { mutableStateOf(state.providerSettings.wigleToken) }
     var revealSecrets by rememberSaveable { mutableStateOf(false) }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(padding).imePadding(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    Box(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentAlignment = Alignment.TopCenter,
     ) {
-        item {
-            Column {
-                Text("Providers", style = MaterialTheme.typography.headlineLarge)
-                Text(
-                    "Optional public datasets for nearby Wi-Fi and cellular previews.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        item {
-            SectionCard(title = "Credentials", iconRes = R.drawable.ms_settings_24) {
-                Text(
-                    "Secrets stay in GeoShift's private local preferences and are not included with exported profiles.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedTextField(
-                    value = openCell,
-                    onValueChange = { openCell = it.trim() },
-                    label = { Text("OpenCellID API key") },
-                    singleLine = true,
-                    visualTransformation = if (revealSecrets) VisualTransformation.None else PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = wigleName,
-                    onValueChange = { wigleName = it.trim() },
-                    label = { Text("WiGLE token name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = wigleToken,
-                    onValueChange = { wigleToken = it.trim() },
-                    label = { Text("WiGLE token") },
-                    singleLine = true,
-                    visualTransformation = if (revealSecrets) VisualTransformation.None else PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                TextButton(onClick = { revealSecrets = !revealSecrets }) {
-                    Text(if (revealSecrets) "Hide secrets" else "Show secrets")
+        LazyColumn(
+            modifier = Modifier.fillMaxHeight().adaptiveContentWidth().imePadding(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                Column {
+                    Text("Providers", style = MaterialTheme.typography.headlineLarge)
+                    Text(
+                        "Optional public datasets for nearby Wi-Fi and cellular previews.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                Button(
-                    onClick = {
-                        actions.saveProviders(
-                            ProviderSettings.Snapshot(
-                                openCellIdApiKey = openCell,
-                                wigleTokenName = wigleName,
-                                wigleToken = wigleToken,
+            }
+            item {
+                SectionCard(title = "Credentials", iconRes = R.drawable.ms_settings_24) {
+                    Text(
+                        "Secrets stay in GeoShift's private local preferences and are not included with exported profiles.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedTextField(
+                        value = openCell,
+                        onValueChange = { openCell = it.trim() },
+                        label = { Text("OpenCellID API key") },
+                        singleLine = true,
+                        visualTransformation = if (revealSecrets) VisualTransformation.None else PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = wigleName,
+                        onValueChange = { wigleName = it.trim() },
+                        label = { Text("WiGLE token name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = wigleToken,
+                        onValueChange = { wigleToken = it.trim() },
+                        label = { Text("WiGLE token") },
+                        singleLine = true,
+                        visualTransformation = if (revealSecrets) VisualTransformation.None else PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    TextButton(onClick = { revealSecrets = !revealSecrets }) {
+                        Text(if (revealSecrets) "Hide secrets" else "Show secrets")
+                    }
+                    Button(
+                        onClick = {
+                            actions.saveProviders(
+                                ProviderSettings.Snapshot(
+                                    openCellIdApiKey = openCell,
+                                    wigleTokenName = wigleName,
+                                    wigleToken = wigleToken,
+                                )
                             )
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Save provider settings")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Save provider settings")
+                    }
                 }
             }
-        }
-        item {
-            SectionCard(title = "Radio preview", iconRes = R.drawable.ms_wifi_24) {
-                Text(state.radioStatus, style = MaterialTheme.typography.bodyMedium)
-                FilledTonalButton(
-                    onClick = actions.previewRadio,
-                    enabled = !state.isRadioBusy && state.profiles.isNotEmpty(),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(if (state.isRadioBusy) "Querying…" else "Preview around latest profile")
+            item {
+                SectionCard(title = "Radio preview", iconRes = R.drawable.ms_wifi_24) {
+                    Text(state.radioStatus, style = MaterialTheme.typography.bodyMedium)
+                    FilledTonalButton(
+                        onClick = actions.previewRadio,
+                        enabled = !state.isRadioBusy && state.profiles.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (state.isRadioBusy) "Querying…" else "Preview around latest profile")
+                    }
+                    Text(
+                        "This screen validates and previews provider data before any deeper integration is enabled.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                Text(
-                    "This screen validates and previews provider data before any deeper integration is enabled.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }
