@@ -1,7 +1,7 @@
 package io.geoshift.app.core
 
-import org.json.JSONArray
-import org.json.JSONObject
+import java.nio.charset.StandardCharsets
+import java.util.Base64
 
 data class WifiAccessPointProfile(
     val ssid: String = "",
@@ -17,42 +17,57 @@ data class WifiAccessPointProfile(
     }
 }
 
+/**
+ * Compact Remote Preferences encoding that is usable from both Android and local JVM tests.
+ * Profile export remains normal JSON in ProfileCodec; this codec is only for internal storage.
+ */
 object WifiAccessPointCodec {
     private const val MAX_POINTS = 8
+    private const val RECORD_SEPARATOR = ";"
+    private const val FIELD_SEPARATOR = "|"
+    private val encoder = Base64.getUrlEncoder().withoutPadding()
+    private val decoder = Base64.getUrlDecoder()
 
-    fun encode(points: List<WifiAccessPointProfile>): String = JSONArray().apply {
+    fun encode(points: List<WifiAccessPointProfile>): String =
         points.asSequence()
             .filter { it.isValid() }
             .distinctBy { it.bssid.lowercase() }
             .take(MAX_POINTS)
-            .forEach { point ->
-                put(JSONObject().apply {
-                    put("ssid", point.ssid)
-                    put("bssid", point.bssid.lowercase())
-                    put("rssiDbm", point.rssiDbm)
-                    put("frequencyMhz", point.frequencyMhz)
-                })
+            .joinToString(RECORD_SEPARATOR) { point ->
+                listOf(
+                    encodeText(point.ssid),
+                    point.bssid.lowercase(),
+                    point.rssiDbm.toString(),
+                    point.frequencyMhz.toString(),
+                ).joinToString(FIELD_SEPARATOR)
             }
-    }.toString()
 
     fun decode(text: String?): List<WifiAccessPointProfile> {
         if (text.isNullOrBlank()) return emptyList()
-        return runCatching {
-            val array = JSONArray(text)
-            buildList {
-                for (index in 0 until minOf(array.length(), MAX_POINTS)) {
-                    val item = array.optJSONObject(index) ?: continue
-                    val point = WifiAccessPointProfile(
-                        ssid = item.optString("ssid", ""),
-                        bssid = item.optString("bssid", "").lowercase(),
-                        rssiDbm = item.optInt("rssiDbm", -55),
-                        frequencyMhz = item.optInt("frequencyMhz", 5200),
-                    )
-                    if (point.isValid()) add(point)
-                }
-            }.distinctBy { it.bssid.lowercase() }
-        }.getOrDefault(emptyList())
+        return text.split(RECORD_SEPARATOR)
+            .asSequence()
+            .take(MAX_POINTS)
+            .mapNotNull { record ->
+                val fields = record.split(FIELD_SEPARATOR)
+                if (fields.size != 4) return@mapNotNull null
+                val point = WifiAccessPointProfile(
+                    ssid = decodeText(fields[0]) ?: return@mapNotNull null,
+                    bssid = fields[1].lowercase(),
+                    rssiDbm = fields[2].toIntOrNull() ?: return@mapNotNull null,
+                    frequencyMhz = fields[3].toIntOrNull() ?: return@mapNotNull null,
+                )
+                point.takeIf { it.isValid() }
+            }
+            .distinctBy { it.bssid.lowercase() }
+            .toList()
     }
+
+    private fun encodeText(value: String): String =
+        encoder.encodeToString(value.toByteArray(StandardCharsets.UTF_8))
+
+    private fun decodeText(value: String): String? = runCatching {
+        String(decoder.decode(value), StandardCharsets.UTF_8)
+    }.getOrNull()
 }
 
 fun GeoProfile.effectiveWifiAccessPoints(): List<WifiAccessPointProfile> {
@@ -68,5 +83,5 @@ fun GeoProfile.effectiveWifiAccessPoints(): List<WifiAccessPointProfile> {
     return buildList {
         primary?.let(::add)
         addAll(wifiAccessPoints)
-    }.distinctBy { it.bssid.lowercase() }.take(8)
+    }.distinctBy { it.bssid.lowercase() }.take(GeoProfile.MAX_WIFI_ACCESS_POINTS)
 }
