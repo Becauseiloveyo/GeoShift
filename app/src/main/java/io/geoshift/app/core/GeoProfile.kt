@@ -20,6 +20,7 @@ data class GeoProfile(
     val wifiSsid: String = "",
     val wifiBssid: String = "",
     val wifiRssiDbm: Int = -45,
+    val wifiAccessPoints: List<WifiAccessPointProfile> = emptyList(),
     val telephonyEnabled: Boolean = false,
     val mcc: String = "",
     val mnc: String = "",
@@ -56,6 +57,12 @@ data class GeoProfile(
         if (wifiEnabled && wifiRssiDbm !in -127..0) {
             add("Wi-Fi RSSI must be between -127 and 0 dBm")
         }
+        if (wifiEnabled && wifiAccessPoints.size > MAX_WIFI_ACCESS_POINTS) {
+            add("Wi-Fi profile cannot contain more than $MAX_WIFI_ACCESS_POINTS access points")
+        }
+        if (wifiEnabled && wifiAccessPoints.any { !it.isValid() }) {
+            add("Wi-Fi access-point list contains invalid entries")
+        }
         if (telephonyEnabled && mcc.isNotBlank() && !mcc.matches(Regex("\\d{3}"))) {
             add("MCC must contain 3 digits")
         }
@@ -71,6 +78,7 @@ data class GeoProfile(
     }
 
     companion object {
+        const val MAX_WIFI_ACCESS_POINTS = 8
         private val AVAILABLE_TIMEZONES = TimeZone.getAvailableIDs().toHashSet()
         private val BSSID_PATTERN = Regex("(?i)[0-9a-f]{2}(:[0-9a-f]{2}){5}")
     }
