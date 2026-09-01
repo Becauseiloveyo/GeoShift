@@ -13,7 +13,8 @@ class OpenCellIdRadioEnvironmentProvider(
 
     override fun nearbyCells(latitude: Double, longitude: Double, radiusMeters: Int): List<CellEnvironment> {
         require(apiKey.isNotBlank()) { "OpenCellID API key is missing" }
-        val box = GeoMath.boundingBox(latitude, longitude, radiusMeters.coerceAtMost(1_500))
+        // OpenCellID rejects overly large BBOX queries. 900 m keeps the generated square below ~4 km².
+        val box = GeoMath.boundingBox(latitude, longitude, radiusMeters.coerceAtMost(900))
         val bbox = listOf(box.minLat, box.minLon, box.maxLat, box.maxLon).joinToString(",")
         val url = URL(
             "https://www.opencellid.org/cell/getInArea" +
@@ -39,10 +40,7 @@ class OpenCellIdRadioEnvironmentProvider(
                     val lat = item.optDouble("lat", Double.NaN)
                     val lon = item.optDouble("lon", Double.NaN)
                     if (!lat.isFinite() || !lon.isFinite()) continue
-                    val area = when {
-                        item.has("tac") -> item.optLong("tac", 0L)
-                        else -> item.optLong("lac", 0L)
-                    }
+                    val area = if (item.has("tac")) item.optLong("tac", 0L) else item.optLong("lac", 0L)
                     add(
                         CellEnvironment(
                             radio = item.optString("radio", "UNKNOWN"),

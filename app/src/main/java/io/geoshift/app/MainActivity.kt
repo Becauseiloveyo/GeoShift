@@ -62,11 +62,8 @@ class MainActivity : Activity() {
 
     private val serviceListener: (XposedService?) -> Unit = { service ->
         runOnUiThread {
-            serviceStatus.text = if (service == null) {
-                "LSPosed service: unavailable"
-            } else {
-                "LSPosed service: ${service.frameworkName} / API ${service.apiVersion}"
-            }
+            serviceStatus.text = if (service == null) "LSPosed service: unavailable"
+            else "LSPosed service: ${service.frameworkName} / API ${service.apiVersion}"
             if (service != null) loadProfile(service)
         }
     }
@@ -74,96 +71,55 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         title = "GeoShift"
-
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(20), dp(20), dp(32))
         }
-        val scroll = ScrollView(this).apply { addView(content) }
-        setContentView(scroll)
+        setContentView(ScrollView(this).apply { addView(content) })
 
-        content.addView(TextView(this).apply {
-            text = "GeoShift 0.2-dev"
-            textSize = 24f
-        })
+        content.addView(TextView(this).apply { text = "GeoShift 0.2-dev"; textSize = 24f })
         content.addView(TextView(this).apply {
             text = "Per-app geographic profile for privacy and compatibility testing."
             textSize = 14f
         })
-
         serviceStatus = statusView("LSPosed service: loading")
         geoStatus = statusView("VPN/GeoIP: idle")
         diagnosticsStatus = statusView("Consistency: not checked")
         radioStatus = statusView("Radio environment: providers not configured")
-        content.addView(serviceStatus)
-        content.addView(geoStatus)
-        content.addView(diagnosticsStatus)
-        content.addView(radioStatus)
+        content.addView(serviceStatus); content.addView(geoStatus); content.addView(diagnosticsStatus); content.addView(radioStatus)
 
         enabled = checkBox("Enable profile", true)
         followVpn = checkBox("Follow VPN/public exit IP in background", false)
         timezoneEnabled = checkBox("Override time zone", true)
         localeEnabled = checkBox("Override locale", true)
         locationEnabled = checkBox("Override latitude/longitude", true)
-        content.addView(enabled)
-        content.addView(followVpn)
-
+        content.addView(enabled); content.addView(followVpn)
         targetPackage = field(content, "Target package", "com.example.app")
-        content.addView(timezoneEnabled)
-        timezone = field(content, "Time zone", "America/Los_Angeles")
-        content.addView(localeEnabled)
-        locale = field(content, "Locale tag", "en-US")
+        content.addView(timezoneEnabled); timezone = field(content, "Time zone", "America/Los_Angeles")
+        content.addView(localeEnabled); locale = field(content, "Locale tag", "en-US")
         country = field(content, "Country code", "US")
-        content.addView(locationEnabled)
-        latitude = field(content, "Latitude", "34.0522", decimal = true)
+        content.addView(locationEnabled); latitude = field(content, "Latitude", "34.0522", decimal = true)
         longitude = field(content, "Longitude", "-118.2437", decimal = true)
 
-        content.addView(Button(this).apply {
-            text = "Request LSPosed scope"
-            setOnClickListener { requestScope() }
-        })
-        content.addView(Button(this).apply {
-            text = "Sync now from exit IP"
-            setOnClickListener { syncFromExitIp() }
-        })
-        content.addView(Button(this).apply {
-            text = "Run consistency check"
-            setOnClickListener { runDiagnostics() }
-        })
-        content.addView(Button(this).apply {
-            text = "Export profile JSON"
-            setOnClickListener { exportProfile() }
-        })
-        content.addView(Button(this).apply {
-            text = "Import profile JSON"
-            setOnClickListener { importProfile() }
-        })
-        content.addView(Button(this).apply {
-            text = "Save profile"
-            setOnClickListener { saveProfile(showToast = true) }
-        })
+        button(content, "Request LSPosed scope") { requestScope() }
+        button(content, "Sync now from exit IP") { syncFromExitIp() }
+        button(content, "Run consistency check") { runDiagnostics() }
+        button(content, "Export profile JSON") { exportProfile() }
+        button(content, "Import profile JSON") { importProfile() }
+        button(content, "Save profile") { saveProfile(showToast = true) }
 
         content.addView(TextView(this).apply {
-            text = "Optional nearby radio data providers"
-            textSize = 18f
-            setPadding(0, dp(18), 0, dp(6))
+            text = "Optional nearby radio data providers"; textSize = 18f; setPadding(0, dp(18), 0, dp(6))
         })
         content.addView(TextView(this).apply {
-            text = "Credentials stay in GeoShift's private local preferences and are never written to LSPosed Remote Preferences or profile exports."
+            text = "Credentials stay in private local preferences and never enter LSPosed Remote Preferences or profile exports."
             textSize = 12f
         })
         openCellIdKey = field(content, "OpenCellID API key", "optional", secret = true)
         wigleTokenName = field(content, "WiGLE API token name", "optional")
         wigleToken = field(content, "WiGLE API token", "optional", secret = true)
-        content.addView(Button(this).apply {
-            text = "Save provider credentials"
-            setOnClickListener { saveProviderSettings() }
-        })
-        content.addView(Button(this).apply {
-            text = "Preview nearby Wi-Fi / cells"
-            setOnClickListener { previewRadioEnvironment() }
-        })
-
+        button(content, "Save provider credentials") { saveProviderSettings() }
+        button(content, "Preview nearby Wi-Fi / cells") { previewRadioEnvironment() }
         loadProviderSettings()
     }
 
@@ -171,15 +127,12 @@ class MainActivity : Activity() {
         super.onStart()
         GeoShiftApp.addServiceListener(serviceListener)
         vpnCallback = vpnDetector.register { state ->
-            runOnUiThread {
-                if (!syncInFlight) geoStatus.text = if (state.active) "VPN detected" else "VPN not detected"
-            }
+            runOnUiThread { if (!syncInFlight) geoStatus.text = if (state.active) "VPN detected" else "VPN not detected" }
         }
     }
 
     override fun onStop() {
-        vpnDetector.unregister(vpnCallback)
-        vpnCallback = null
+        vpnDetector.unregister(vpnCallback); vpnCallback = null
         GeoShiftApp.removeServiceListener(serviceListener)
         super.onStop()
     }
@@ -191,28 +144,18 @@ class MainActivity : Activity() {
         val uri = data?.data ?: return
         when (requestCode) {
             REQUEST_EXPORT -> runCatching {
-                val profile = profileFromUi()
-                val errors = profile.validate()
-                require(errors.isEmpty()) { errors.first() }
+                val profile = profileFromUi(); val errors = profile.validate(); require(errors.isEmpty()) { errors.first() }
                 contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { it.write(ProfileCodec.encode(profile)) }
                     ?: error("Could not open export destination")
-            }.onSuccess { toast("Profile exported") }
-                .onFailure { toast("Export failed: ${it.message}") }
-
+            }.onSuccess { toast("Profile exported") }.onFailure { toast("Export failed: ${it.message}") }
             REQUEST_IMPORT -> runCatching {
                 val text = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
                     ?: error("Could not read profile file")
                 ProfileCodec.decode(text)
             }.onSuccess { imported ->
                 val errors = imported.validate()
-                if (errors.isNotEmpty()) {
-                    toast("Import rejected: ${errors.first()}")
-                } else {
-                    storedProfile = imported
-                    populateProfile(imported)
-                    saveProfile(showToast = false)
-                    runDiagnostics()
-                    toast("Profile imported and saved")
+                if (errors.isNotEmpty()) toast("Import rejected: ${errors.first()}") else {
+                    storedProfile = imported; populateProfile(imported); saveProfile(false); runDiagnostics(); toast("Profile imported and saved")
                 }
             }.onFailure { toast("Import failed: ${it.message}") }
         }
@@ -220,149 +163,87 @@ class MainActivity : Activity() {
 
     private fun requestScope() {
         val service = GeoShiftApp.service ?: return toast("LSPosed service is not connected")
-        val pkg = targetPackage.text.toString().trim()
-        if (pkg.isBlank()) return toast("Enter a target package first")
+        val pkg = targetPackage.text.toString().trim(); if (pkg.isBlank()) return toast("Enter a target package first")
         service.requestScope(listOf(pkg), object : XposedService.OnScopeEventListener {
-            override fun onScopeRequestApproved(approved: List<String>) {
-                runOnUiThread { toast("Scope approved: ${approved.joinToString()}") }
-            }
-            override fun onScopeRequestFailed(message: String) {
-                runOnUiThread { toast("Scope request failed: $message") }
-            }
+            override fun onScopeRequestApproved(approved: List<String>) { runOnUiThread { toast("Scope approved: ${approved.joinToString()}") } }
+            override fun onScopeRequestFailed(message: String) { runOnUiThread { toast("Scope request failed: $message") } }
         })
     }
 
     private fun loadProfile(service: XposedService) {
-        val profile = ProfileStore.load(service)
-        storedProfile = profile
+        val profile = ProfileStore.load(service); storedProfile = profile
         if (profile.targetPackage.isBlank()) return
-        populateProfile(profile)
-        updateLastSyncStatus(profile)
-        if (profile.enabled && profile.followVpn) {
-            requestNotificationPermissionIfUseful()
-            VpnFollowService.start(this)
-        }
+        populateProfile(profile); updateLastSyncStatus(profile)
+        if (profile.enabled && profile.followVpn) { requestNotificationPermissionIfUseful(); VpnFollowService.start(this) }
     }
 
     private fun populateProfile(profile: GeoProfile) {
-        enabled.isChecked = profile.enabled
-        followVpn.isChecked = profile.followVpn
-        timezoneEnabled.isChecked = profile.timezoneEnabled
-        localeEnabled.isChecked = profile.localeEnabled
-        locationEnabled.isChecked = profile.locationEnabled
-        targetPackage.setText(profile.targetPackage)
-        timezone.setText(profile.timezoneId)
-        locale.setText(profile.localeTag)
-        country.setText(profile.countryCode)
-        latitude.setText(profile.latitude.toString())
-        longitude.setText(profile.longitude.toString())
+        enabled.isChecked = profile.enabled; followVpn.isChecked = profile.followVpn
+        timezoneEnabled.isChecked = profile.timezoneEnabled; localeEnabled.isChecked = profile.localeEnabled
+        locationEnabled.isChecked = profile.locationEnabled; targetPackage.setText(profile.targetPackage)
+        timezone.setText(profile.timezoneId); locale.setText(profile.localeTag); country.setText(profile.countryCode)
+        latitude.setText(profile.latitude.toString()); longitude.setText(profile.longitude.toString())
     }
 
     private fun profileFromUi(): GeoProfile = storedProfile.copy(
-        enabled = enabled.isChecked,
-        targetPackage = targetPackage.text.toString().trim(),
-        followVpn = followVpn.isChecked,
-        timezoneEnabled = timezoneEnabled.isChecked,
-        timezoneId = timezone.text.toString().trim(),
-        localeEnabled = localeEnabled.isChecked,
-        localeTag = locale.text.toString().trim(),
-        countryCode = country.text.toString().trim().uppercase(),
-        locationEnabled = locationEnabled.isChecked,
-        latitude = latitude.text.toString().toDoubleOrNull() ?: Double.NaN,
+        enabled = enabled.isChecked, targetPackage = targetPackage.text.toString().trim(), followVpn = followVpn.isChecked,
+        timezoneEnabled = timezoneEnabled.isChecked, timezoneId = timezone.text.toString().trim(),
+        localeEnabled = localeEnabled.isChecked, localeTag = locale.text.toString().trim(), countryCode = country.text.toString().trim().uppercase(),
+        locationEnabled = locationEnabled.isChecked, latitude = latitude.text.toString().toDoubleOrNull() ?: Double.NaN,
         longitude = longitude.text.toString().toDoubleOrNull() ?: Double.NaN,
     )
 
     private fun saveProfile(showToast: Boolean) {
-        val service = GeoShiftApp.service ?: run {
-            if (showToast) toast("LSPosed service is not connected")
-            return
-        }
-        val profile = profileFromUi()
-        val errors = profile.validate()
-        if (errors.isNotEmpty()) {
-            if (showToast) toast(errors.first())
-            return
-        }
-        if (!ProfileStore.save(service, profile)) {
-            if (showToast) toast("Could not save profile")
-            return
-        }
+        val service = GeoShiftApp.service ?: run { if (showToast) toast("LSPosed service is not connected"); return }
+        val profile = profileFromUi(); val errors = profile.validate()
+        if (errors.isNotEmpty()) { if (showToast) toast(errors.first()); return }
+        if (!ProfileStore.save(service, profile)) { if (showToast) toast("Could not save profile"); return }
         storedProfile = profile
-        if (profile.enabled && profile.followVpn) {
-            requestNotificationPermissionIfUseful()
-            VpnFollowService.start(this)
-        } else {
-            VpnFollowService.stop(this)
-        }
-        runDiagnostics()
-        if (showToast) toast("Profile saved")
+        if (profile.enabled && profile.followVpn) { requestNotificationPermissionIfUseful(); VpnFollowService.start(this) }
+        else VpnFollowService.stop(this)
+        runDiagnostics(); if (showToast) toast("Profile saved")
     }
 
     private fun syncFromExitIp() {
         if (syncInFlight) return
-        syncInFlight = true
-        geoStatus.text = "GeoIP: resolving current exit…"
-        val base = profileFromUi()
+        syncInFlight = true; geoStatus.text = "GeoIP: resolving current exit…"; val base = profileFromUi()
         Thread {
             try {
                 val outcome = synchronizer.synchronize(base)
                 runOnUiThread {
-                    storedProfile = outcome.profile
-                    populateProfile(outcome.profile)
-                    updateLastSyncStatus(outcome.profile)
-                    if (followVpn.isChecked) saveProfile(showToast = false)
-                    runDiagnostics()
+                    storedProfile = outcome.profile; populateProfile(outcome.profile); updateLastSyncStatus(outcome.profile)
+                    if (followVpn.isChecked) saveProfile(false); runDiagnostics()
                 }
-            } catch (error: Throwable) {
-                runOnUiThread { geoStatus.text = "GeoIP failed: ${error.message}" }
-            } finally {
-                syncInFlight = false
-            }
+            } catch (error: Throwable) { runOnUiThread { geoStatus.text = "GeoIP failed: ${error.message}" } }
+            finally { syncInFlight = false }
         }.start()
     }
 
     private fun runDiagnostics() {
         val issues = ProfileDiagnostics.evaluate(profileFromUi())
-        diagnosticsStatus.text = if (issues.isEmpty()) {
-            "Consistency: no obvious profile conflicts"
-        } else {
-            "Consistency: " + issues.joinToString(" · ") { "${it.severity}: ${it.message}" }
-        }
+        diagnosticsStatus.text = if (issues.isEmpty()) "Consistency: no obvious profile conflicts"
+        else "Consistency: " + issues.joinToString(" · ") { "${it.severity}: ${it.message}" }
     }
 
     private fun loadProviderSettings() {
         val settings = ProviderSettings.load(this)
-        openCellIdKey.setText(settings.openCellIdApiKey)
-        wigleTokenName.setText(settings.wigleTokenName)
-        wigleToken.setText(settings.wigleToken)
-        radioProvider = buildRadioProvider(settings)
-        updateProviderStatus(settings)
+        openCellIdKey.setText(settings.openCellIdApiKey); wigleTokenName.setText(settings.wigleTokenName); wigleToken.setText(settings.wigleToken)
+        radioProvider = buildRadioProvider(settings); updateProviderStatus(settings)
     }
 
     private fun saveProviderSettings() {
-        val settings = ProviderSettings.Snapshot(
-            openCellIdApiKey = openCellIdKey.text.toString(),
-            wigleTokenName = wigleTokenName.text.toString(),
-            wigleToken = wigleToken.text.toString(),
-        )
-        if (settings.wigleTokenName.isBlank() != settings.wigleToken.isBlank()) {
-            return toast("Enter both WiGLE token name and token")
-        }
-        ProviderSettings.save(this, settings)
-        radioProvider = buildRadioProvider(settings)
-        updateProviderStatus(settings)
+        val settings = ProviderSettings.Snapshot(openCellIdKey.text.toString(), wigleTokenName.text.toString(), wigleToken.text.toString())
+        if (settings.wigleTokenName.isBlank() != settings.wigleToken.isBlank()) return toast("Enter both WiGLE token name and token")
+        ProviderSettings.save(this, settings); radioProvider = buildRadioProvider(settings); updateProviderStatus(settings)
         toast("Provider credentials saved locally")
     }
 
     private fun buildRadioProvider(settings: ProviderSettings.Snapshot): RadioEnvironmentProvider? {
         val providers = buildList {
             if (settings.openCellIdApiKey.isNotBlank()) add(OpenCellIdRadioEnvironmentProvider(settings.openCellIdApiKey))
-            if (settings.wigleTokenName.isNotBlank() && settings.wigleToken.isNotBlank()) {
-                add(WigleRadioEnvironmentProvider(settings.wigleTokenName, settings.wigleToken))
-            }
+            if (settings.wigleTokenName.isNotBlank() && settings.wigleToken.isNotBlank()) add(WigleRadioEnvironmentProvider(settings.wigleTokenName, settings.wigleToken))
         }
-        if (providers.isEmpty()) return null
-        return CachingRadioEnvironmentProvider(CompositeRadioEnvironmentProvider(providers))
+        return if (providers.isEmpty()) null else CachingRadioEnvironmentProvider(CompositeRadioEnvironmentProvider(providers))
     }
 
     private fun updateProviderStatus(settings: ProviderSettings.Snapshot) {
@@ -376,17 +257,13 @@ class MainActivity : Activity() {
     private fun previewRadioEnvironment() {
         if (radioQueryInFlight) return
         val provider = radioProvider ?: return toast("Configure at least one radio data provider first")
-        val lat = latitude.text.toString().toDoubleOrNull()
-        val lon = longitude.text.toString().toDoubleOrNull()
-        if (lat == null || lon == null || !lat.isFinite() || !lon.isFinite() || lat !in -90.0..90.0 || lon !in -180.0..180.0) {
-            return toast("Enter valid latitude/longitude first")
-        }
-        radioQueryInFlight = true
-        radioStatus.text = "Radio environment: querying nearby data…"
+        val lat = latitude.text.toString().toDoubleOrNull(); val lon = longitude.text.toString().toDoubleOrNull()
+        if (lat == null || lon == null || !lat.isFinite() || !lon.isFinite() || lat !in -90.0..90.0 || lon !in -180.0..180.0) return toast("Enter valid latitude/longitude first")
+        radioQueryInFlight = true; radioStatus.text = "Radio environment: querying nearby data…"
         Thread {
             try {
                 val wifi = provider.nearbyWifi(lat, lon, 750)
-                val cells = provider.nearbyCells(lat, lon, 1_500)
+                val cells = provider.nearbyCells(lat, lon, 900)
                 runOnUiThread {
                     val wifiPreview = wifi.take(3).joinToString { it.ssid?.ifBlank { it.bssid } ?: it.bssid }
                     val cellPreview = cells.take(3).joinToString { "${it.radio} ${it.mcc}/${it.mnc}/${it.areaCode}/${it.cellId}" }
@@ -396,11 +273,8 @@ class MainActivity : Activity() {
                         if (cellPreview.isNotBlank()) append(" · Cells: $cellPreview")
                     }
                 }
-            } catch (error: Throwable) {
-                runOnUiThread { radioStatus.text = "Radio provider query failed: ${error.message}" }
-            } finally {
-                radioQueryInFlight = false
-            }
+            } catch (error: Throwable) { runOnUiThread { radioStatus.text = "Radio provider query failed: ${error.message}" } }
+            finally { radioQueryInFlight = false }
         }.start()
     }
 
@@ -412,39 +286,24 @@ class MainActivity : Activity() {
 
     private fun updateLastSyncStatus(profile: GeoProfile) {
         if (profile.lastSyncIp.isBlank()) return
-        val whenText = if (profile.lastSyncAtEpochMs > 0L) {
-            DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(profile.lastSyncAtEpochMs))
-        } else "unknown time"
-        val place = listOf(profile.lastSyncCity, profile.lastSyncRegion, profile.countryCode)
-            .filter { it.isNotBlank() }.joinToString(", ")
+        val whenText = if (profile.lastSyncAtEpochMs > 0L) DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(profile.lastSyncAtEpochMs)) else "unknown time"
+        val place = listOf(profile.lastSyncCity, profile.lastSyncRegion, profile.countryCode).filter { it.isNotBlank() }.joinToString(", ")
         geoStatus.text = "Last sync ${profile.lastSyncIp}: $place · $whenText"
     }
 
     private fun exportProfile() {
-        val errors = profileFromUi().validate()
-        if (errors.isNotEmpty()) return toast(errors.first())
+        val errors = profileFromUi().validate(); if (errors.isNotEmpty()) return toast(errors.first())
         val pkg = targetPackage.text.toString().trim().ifBlank { "profile" }.replace('.', '-')
         startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "application/json"
-            putExtra(Intent.EXTRA_TITLE, "GeoShift-$pkg.json")
+            addCategory(Intent.CATEGORY_OPENABLE); type = "application/json"; putExtra(Intent.EXTRA_TITLE, "GeoShift-$pkg.json")
         }, REQUEST_EXPORT)
     }
 
     private fun importProfile() {
-        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "application/json"
-        }, REQUEST_IMPORT)
+        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "application/json" }, REQUEST_IMPORT)
     }
 
-    private fun field(
-        parent: ViewGroup,
-        label: String,
-        hint: String,
-        decimal: Boolean = false,
-        secret: Boolean = false,
-    ): EditText {
+    private fun field(parent: ViewGroup, label: String, hint: String, decimal: Boolean = false, secret: Boolean = false): EditText {
         parent.addView(TextView(this).apply { text = label })
         return EditText(this).also {
             it.hint = hint
@@ -457,16 +316,12 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun checkBox(text: String, checked: Boolean) = CheckBox(this).apply {
-        this.text = text
-        isChecked = checked
+    private fun button(parent: ViewGroup, text: String, action: () -> Unit) {
+        parent.addView(Button(this).apply { this.text = text; setOnClickListener { action() } })
     }
 
-    private fun statusView(initial: String) = TextView(this).apply {
-        text = initial
-        setPadding(0, dp(10), 0, dp(10))
-    }
-
+    private fun checkBox(text: String, checked: Boolean) = CheckBox(this).apply { this.text = text; isChecked = checked }
+    private fun statusView(initial: String) = TextView(this).apply { text = initial; setPadding(0, dp(10), 0, dp(10)) }
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 

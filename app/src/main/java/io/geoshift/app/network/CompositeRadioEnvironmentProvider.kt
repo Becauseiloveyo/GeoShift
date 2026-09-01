@@ -1,17 +1,19 @@
 package io.geoshift.app.network
 
+import kotlin.math.roundToInt
+
 class CompositeRadioEnvironmentProvider(
     private val providers: List<RadioEnvironmentProvider>,
 ) : RadioEnvironmentProvider {
     override fun nearbyWifi(latitude: Double, longitude: Double, radiusMeters: Int): List<WifiEnvironment> {
-        return providers.flatMap { provider -> runCatching { provider.nearbyWifi(latitude, longitude, radiusMeters) }.getOrDefault(emptyList()) }
+        return providers.flatMap { it.nearbyWifi(latitude, longitude, radiusMeters) }
             .filter { GeoMath.distanceMeters(latitude, longitude, it.latitude, it.longitude) <= radiusMeters }
             .distinctBy { it.bssid.uppercase() }
             .sortedBy { GeoMath.distanceMeters(latitude, longitude, it.latitude, it.longitude) }
     }
 
     override fun nearbyCells(latitude: Double, longitude: Double, radiusMeters: Int): List<CellEnvironment> {
-        return providers.flatMap { provider -> runCatching { provider.nearbyCells(latitude, longitude, radiusMeters) }.getOrDefault(emptyList()) }
+        return providers.flatMap { it.nearbyCells(latitude, longitude, radiusMeters) }
             .filter { GeoMath.distanceMeters(latitude, longitude, it.latitude, it.longitude) <= radiusMeters }
             .distinctBy { "${it.radio.uppercase()}:${it.mcc}:${it.mnc}:${it.areaCode}:${it.cellId}" }
             .sortedBy { GeoMath.distanceMeters(latitude, longitude, it.latitude, it.longitude) }
@@ -37,19 +39,21 @@ class CachingRadioEnvironmentProvider(
         }
 
     private fun key(latitude: Double, longitude: Double, radiusMeters: Int, kind: String) = Key(
-        latBucket = (latitude * 10_000).toInt(),
-        lonBucket = (longitude * 10_000).toInt(),
+        latBucket = (latitude * 10_000).roundToInt(),
+        lonBucket = (longitude * 10_000).roundToInt(),
         radius = radiusMeters,
         kind = kind,
     )
 
     @Suppress("UNCHECKED_CAST")
-    private fun <T : Any> cached(key: Key, loader: () -> T): T = synchronized(cache) {
+    private fun <T : Any> cached(key: Key, loader: () -> T): T {
         val now = System.currentTimeMillis()
-        val current = cache[key]
-        if (current != null && now - current.createdAt <= ttlMs) return@synchronized current.value as T
+        synchronized(cache) {
+            val current = cache[key]
+            if (current != null && now - current.createdAt <= ttlMs) return current.value as T
+        }
         val loaded = loader()
-        cache[key] = Entry(now, loaded)
-        loaded
+        synchronized(cache) { cache[key] = Entry(System.currentTimeMillis(), loaded) }
+        return loaded
     }
 }
