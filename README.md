@@ -18,7 +18,7 @@ The first implementation uses the Modern Xposed API 102 and keeps one coherent p
 - Per-app `Locale.getDefault()` override
 - Per-app latitude/longitude override for Android `Location` objects
 - Wi-Fi/cellular environment provider interfaces for later database-backed implementations
-- Android CI workflow
+- Android CI build with downloadable debug APK artifact
 
 ### Follow VPN flow
 
@@ -37,15 +37,17 @@ The current automatic listener runs while the GeoShift manager is open. Persiste
 
 Requirements:
 
-- JDK 17
-- Android SDK 36
-- Gradle 8.13
+- JDK 21
+- Android SDK Platform 37.0 / Build Tools 37.0.0
+- Gradle 9.5.1
 
 ```bash
 gradle :app:assembleDebug
 ```
 
-The project uses Android Gradle Plugin 8.13.2, Kotlin 2.3.21, `io.github.libxposed:api:102.0.0`, and `io.github.libxposed:service:102.0.0`.
+The project uses Android Gradle Plugin 9.2.1, Android API 37, `io.github.libxposed:api:102.0.0`, and `io.github.libxposed:service:102.0.0`. AGP 9's built-in Kotlin support is used instead of applying the legacy Kotlin Android Gradle plugin.
+
+Every CI build uploads `app-debug.apk` as a `GeoShift-debug-<commit>` GitHub Actions artifact for 14 days.
 
 ## Next milestones
 
