@@ -28,12 +28,6 @@ android {
     }
 }
 
-androidComponents {
-    beforeVariants(selector().all()) {
-        enabled = buildType == "benchmark"
-    }
-}
-
 dependencies {
     implementation("androidx.benchmark:benchmark-macro-junit4:1.4.1")
     implementation("androidx.test.ext:junit:1.3.0")
