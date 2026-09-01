@@ -1,8 +1,11 @@
 package io.geoshift.app
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
+import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.view.ViewGroup
@@ -17,8 +20,14 @@ import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.ProfileCodec
 import io.geoshift.app.core.ProfileDiagnostics
 import io.geoshift.app.core.ProfileStore
+import io.geoshift.app.core.ProviderSettings
+import io.geoshift.app.network.CachingRadioEnvironmentProvider
+import io.geoshift.app.network.CompositeRadioEnvironmentProvider
 import io.geoshift.app.network.GeoProfileSynchronizer
+import io.geoshift.app.network.OpenCellIdRadioEnvironmentProvider
+import io.geoshift.app.network.RadioEnvironmentProvider
 import io.geoshift.app.network.VpnDetector
+import io.geoshift.app.network.WigleRadioEnvironmentProvider
 import io.github.libxposed.service.XposedService
 import java.text.DateFormat
 import java.util.Date
@@ -27,12 +36,16 @@ class MainActivity : Activity() {
     private lateinit var serviceStatus: TextView
     private lateinit var geoStatus: TextView
     private lateinit var diagnosticsStatus: TextView
+    private lateinit var radioStatus: TextView
     private lateinit var targetPackage: EditText
     private lateinit var timezone: EditText
     private lateinit var locale: EditText
     private lateinit var country: EditText
     private lateinit var latitude: EditText
     private lateinit var longitude: EditText
+    private lateinit var openCellIdKey: EditText
+    private lateinit var wigleTokenName: EditText
+    private lateinit var wigleToken: EditText
     private lateinit var enabled: CheckBox
     private lateinit var followVpn: CheckBox
     private lateinit var timezoneEnabled: CheckBox
@@ -43,7 +56,9 @@ class MainActivity : Activity() {
     private val synchronizer = GeoProfileSynchronizer()
     private var vpnCallback: ConnectivityManager.NetworkCallback? = null
     @Volatile private var syncInFlight = false
+    @Volatile private var radioQueryInFlight = false
     private var storedProfile: GeoProfile = GeoProfile()
+    private var radioProvider: RadioEnvironmentProvider? = null
 
     private val serviceListener: (XposedService?) -> Unit = { service ->
         runOnUiThread {
@@ -79,9 +94,11 @@ class MainActivity : Activity() {
         serviceStatus = statusView("LSPosed service: loading")
         geoStatus = statusView("VPN/GeoIP: idle")
         diagnosticsStatus = statusView("Consistency: not checked")
+        radioStatus = statusView("Radio environment: providers not configured")
         content.addView(serviceStatus)
         content.addView(geoStatus)
         content.addView(diagnosticsStatus)
+        content.addView(radioStatus)
 
         enabled = checkBox("Enable profile", true)
         followVpn = checkBox("Follow VPN/public exit IP in background", false)
@@ -125,6 +142,29 @@ class MainActivity : Activity() {
             text = "Save profile"
             setOnClickListener { saveProfile(showToast = true) }
         })
+
+        content.addView(TextView(this).apply {
+            text = "Optional nearby radio data providers"
+            textSize = 18f
+            setPadding(0, dp(18), 0, dp(6))
+        })
+        content.addView(TextView(this).apply {
+            text = "Credentials stay in GeoShift's private local preferences and are never written to LSPosed Remote Preferences or profile exports."
+            textSize = 12f
+        })
+        openCellIdKey = field(content, "OpenCellID API key", "optional", secret = true)
+        wigleTokenName = field(content, "WiGLE API token name", "optional")
+        wigleToken = field(content, "WiGLE API token", "optional", secret = true)
+        content.addView(Button(this).apply {
+            text = "Save provider credentials"
+            setOnClickListener { saveProviderSettings() }
+        })
+        content.addView(Button(this).apply {
+            text = "Preview nearby Wi-Fi / cells"
+            setOnClickListener { previewRadioEnvironment() }
+        })
+
+        loadProviderSettings()
     }
 
     override fun onStart() {
@@ -132,9 +172,7 @@ class MainActivity : Activity() {
         GeoShiftApp.addServiceListener(serviceListener)
         vpnCallback = vpnDetector.register { state ->
             runOnUiThread {
-                if (!syncInFlight) {
-                    geoStatus.text = if (state.active) "VPN detected" else "VPN not detected"
-                }
+                if (!syncInFlight) geoStatus.text = if (state.active) "VPN detected" else "VPN not detected"
             }
         }
     }
@@ -156,14 +194,10 @@ class MainActivity : Activity() {
                 val profile = profileFromUi()
                 val errors = profile.validate()
                 require(errors.isEmpty()) { errors.first() }
-                contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use {
-                    it.write(ProfileCodec.encode(profile))
-                } ?: error("Could not open export destination")
-            }.onSuccess {
-                toast("Profile exported")
-            }.onFailure {
-                toast("Export failed: ${it.message}")
-            }
+                contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { it.write(ProfileCodec.encode(profile)) }
+                    ?: error("Could not open export destination")
+            }.onSuccess { toast("Profile exported") }
+                .onFailure { toast("Export failed: ${it.message}") }
 
             REQUEST_IMPORT -> runCatching {
                 val text = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
@@ -180,9 +214,7 @@ class MainActivity : Activity() {
                     runDiagnostics()
                     toast("Profile imported and saved")
                 }
-            }.onFailure {
-                toast("Import failed: ${it.message}")
-            }
+            }.onFailure { toast("Import failed: ${it.message}") }
         }
     }
 
@@ -190,12 +222,10 @@ class MainActivity : Activity() {
         val service = GeoShiftApp.service ?: return toast("LSPosed service is not connected")
         val pkg = targetPackage.text.toString().trim()
         if (pkg.isBlank()) return toast("Enter a target package first")
-
         service.requestScope(listOf(pkg), object : XposedService.OnScopeEventListener {
             override fun onScopeRequestApproved(approved: List<String>) {
                 runOnUiThread { toast("Scope approved: ${approved.joinToString()}") }
             }
-
             override fun onScopeRequestFailed(message: String) {
                 runOnUiThread { toast("Scope request failed: $message") }
             }
@@ -208,7 +238,10 @@ class MainActivity : Activity() {
         if (profile.targetPackage.isBlank()) return
         populateProfile(profile)
         updateLastSyncStatus(profile)
-        if (profile.enabled && profile.followVpn) VpnFollowService.start(this)
+        if (profile.enabled && profile.followVpn) {
+            requestNotificationPermissionIfUseful()
+            VpnFollowService.start(this)
+        }
     }
 
     private fun populateProfile(profile: GeoProfile) {
@@ -256,6 +289,7 @@ class MainActivity : Activity() {
         }
         storedProfile = profile
         if (profile.enabled && profile.followVpn) {
+            requestNotificationPermissionIfUseful()
             VpnFollowService.start(this)
         } else {
             VpnFollowService.stop(this)
@@ -269,7 +303,6 @@ class MainActivity : Activity() {
         syncInFlight = true
         geoStatus.text = "GeoIP: resolving current exit…"
         val base = profileFromUi()
-
         Thread {
             try {
                 val outcome = synchronizer.synchronize(base)
@@ -297,17 +330,93 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun loadProviderSettings() {
+        val settings = ProviderSettings.load(this)
+        openCellIdKey.setText(settings.openCellIdApiKey)
+        wigleTokenName.setText(settings.wigleTokenName)
+        wigleToken.setText(settings.wigleToken)
+        radioProvider = buildRadioProvider(settings)
+        updateProviderStatus(settings)
+    }
+
+    private fun saveProviderSettings() {
+        val settings = ProviderSettings.Snapshot(
+            openCellIdApiKey = openCellIdKey.text.toString(),
+            wigleTokenName = wigleTokenName.text.toString(),
+            wigleToken = wigleToken.text.toString(),
+        )
+        if (settings.wigleTokenName.isBlank() != settings.wigleToken.isBlank()) {
+            return toast("Enter both WiGLE token name and token")
+        }
+        ProviderSettings.save(this, settings)
+        radioProvider = buildRadioProvider(settings)
+        updateProviderStatus(settings)
+        toast("Provider credentials saved locally")
+    }
+
+    private fun buildRadioProvider(settings: ProviderSettings.Snapshot): RadioEnvironmentProvider? {
+        val providers = buildList {
+            if (settings.openCellIdApiKey.isNotBlank()) add(OpenCellIdRadioEnvironmentProvider(settings.openCellIdApiKey))
+            if (settings.wigleTokenName.isNotBlank() && settings.wigleToken.isNotBlank()) {
+                add(WigleRadioEnvironmentProvider(settings.wigleTokenName, settings.wigleToken))
+            }
+        }
+        if (providers.isEmpty()) return null
+        return CachingRadioEnvironmentProvider(CompositeRadioEnvironmentProvider(providers))
+    }
+
+    private fun updateProviderStatus(settings: ProviderSettings.Snapshot) {
+        val active = buildList {
+            if (settings.openCellIdApiKey.isNotBlank()) add("OpenCellID cells")
+            if (settings.wigleTokenName.isNotBlank() && settings.wigleToken.isNotBlank()) add("WiGLE Wi-Fi")
+        }
+        radioStatus.text = if (active.isEmpty()) "Radio environment: providers not configured" else "Radio providers: ${active.joinToString()}"
+    }
+
+    private fun previewRadioEnvironment() {
+        if (radioQueryInFlight) return
+        val provider = radioProvider ?: return toast("Configure at least one radio data provider first")
+        val lat = latitude.text.toString().toDoubleOrNull()
+        val lon = longitude.text.toString().toDoubleOrNull()
+        if (lat == null || lon == null || !lat.isFinite() || !lon.isFinite() || lat !in -90.0..90.0 || lon !in -180.0..180.0) {
+            return toast("Enter valid latitude/longitude first")
+        }
+        radioQueryInFlight = true
+        radioStatus.text = "Radio environment: querying nearby data…"
+        Thread {
+            try {
+                val wifi = provider.nearbyWifi(lat, lon, 750)
+                val cells = provider.nearbyCells(lat, lon, 1_500)
+                runOnUiThread {
+                    val wifiPreview = wifi.take(3).joinToString { it.ssid?.ifBlank { it.bssid } ?: it.bssid }
+                    val cellPreview = cells.take(3).joinToString { "${it.radio} ${it.mcc}/${it.mnc}/${it.areaCode}/${it.cellId}" }
+                    radioStatus.text = buildString {
+                        append("Radio environment: ${wifi.size} Wi-Fi, ${cells.size} cells")
+                        if (wifiPreview.isNotBlank()) append(" · Wi-Fi: $wifiPreview")
+                        if (cellPreview.isNotBlank()) append(" · Cells: $cellPreview")
+                    }
+                }
+            } catch (error: Throwable) {
+                runOnUiThread { radioStatus.text = "Radio provider query failed: ${error.message}" }
+            } finally {
+                radioQueryInFlight = false
+            }
+        }.start()
+    }
+
+    private fun requestNotificationPermissionIfUseful() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIFICATIONS)
+        }
+    }
+
     private fun updateLastSyncStatus(profile: GeoProfile) {
         if (profile.lastSyncIp.isBlank()) return
         val whenText = if (profile.lastSyncAtEpochMs > 0L) {
-            DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-                .format(Date(profile.lastSyncAtEpochMs))
-        } else {
-            "unknown time"
-        }
+            DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(profile.lastSyncAtEpochMs))
+        } else "unknown time"
         val place = listOf(profile.lastSyncCity, profile.lastSyncRegion, profile.countryCode)
-            .filter { it.isNotBlank() }
-            .joinToString(", ")
+            .filter { it.isNotBlank() }.joinToString(", ")
         geoStatus.text = "Last sync ${profile.lastSyncIp}: $place · $whenText"
     }
 
@@ -329,13 +438,20 @@ class MainActivity : Activity() {
         }, REQUEST_IMPORT)
     }
 
-    private fun field(parent: ViewGroup, label: String, hint: String, decimal: Boolean = false): EditText {
+    private fun field(
+        parent: ViewGroup,
+        label: String,
+        hint: String,
+        decimal: Boolean = false,
+        secret: Boolean = false,
+    ): EditText {
         parent.addView(TextView(this).apply { text = label })
         return EditText(this).also {
             it.hint = hint
-            if (decimal) {
-                it.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or
-                    InputType.TYPE_NUMBER_FLAG_SIGNED
+            it.inputType = when {
+                decimal -> InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
+                secret -> InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                else -> InputType.TYPE_CLASS_TEXT
             }
             parent.addView(it)
         }
@@ -357,5 +473,6 @@ class MainActivity : Activity() {
     companion object {
         private const val REQUEST_EXPORT = 2001
         private const val REQUEST_IMPORT = 2002
+        private const val REQUEST_NOTIFICATIONS = 2003
     }
 }

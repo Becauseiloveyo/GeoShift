@@ -5,7 +5,8 @@ data class WifiEnvironment(
     val ssid: String?,
     val latitude: Double,
     val longitude: Double,
-    val estimatedRssiDbm: Int,
+    val estimatedRssiDbm: Int? = null,
+    val source: String = "",
 )
 
 data class CellEnvironment(
@@ -16,6 +17,8 @@ data class CellEnvironment(
     val cellId: Long,
     val latitude: Double,
     val longitude: Double,
+    val estimatedSignalDbm: Int? = null,
+    val source: String = "",
 )
 
 interface RadioEnvironmentProvider {
