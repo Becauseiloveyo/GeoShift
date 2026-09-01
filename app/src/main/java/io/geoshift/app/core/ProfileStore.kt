@@ -17,6 +17,15 @@ object ProfileStore {
     const val KEY_LOCATION_ENABLED = "location_enabled"
     const val KEY_LATITUDE = "latitude"
     const val KEY_LONGITUDE = "longitude"
+    const val KEY_GEOCODER_ENABLED = "geocoder_enabled"
+    const val KEY_WIFI_ENABLED = "wifi_enabled"
+    const val KEY_WIFI_SSID = "wifi_ssid"
+    const val KEY_WIFI_BSSID = "wifi_bssid"
+    const val KEY_TELEPHONY_ENABLED = "telephony_enabled"
+    const val KEY_MCC = "mcc"
+    const val KEY_MNC = "mnc"
+    const val KEY_OPERATOR_NAME = "operator_name"
+    const val KEY_RADIO_SOURCE = "radio_source"
     const val KEY_LAST_SYNC_IP = "last_sync_ip"
     const val KEY_LAST_SYNC_CITY = "last_sync_city"
     const val KEY_LAST_SYNC_REGION = "last_sync_region"
@@ -36,6 +45,15 @@ object ProfileStore {
         locationEnabled = prefs.getBoolean(KEY_LOCATION_ENABLED, true),
         latitude = prefs.getString(KEY_LATITUDE, "0.0")?.toDoubleOrNull() ?: 0.0,
         longitude = prefs.getString(KEY_LONGITUDE, "0.0")?.toDoubleOrNull() ?: 0.0,
+        geocoderEnabled = prefs.getBoolean(KEY_GEOCODER_ENABLED, true),
+        wifiEnabled = prefs.getBoolean(KEY_WIFI_ENABLED, false),
+        wifiSsid = prefs.getString(KEY_WIFI_SSID, "").orEmpty(),
+        wifiBssid = prefs.getString(KEY_WIFI_BSSID, "").orEmpty(),
+        telephonyEnabled = prefs.getBoolean(KEY_TELEPHONY_ENABLED, false),
+        mcc = prefs.getString(KEY_MCC, "").orEmpty(),
+        mnc = prefs.getString(KEY_MNC, "").orEmpty(),
+        operatorName = prefs.getString(KEY_OPERATOR_NAME, "").orEmpty(),
+        radioSource = prefs.getString(KEY_RADIO_SOURCE, "").orEmpty(),
         lastSyncIp = prefs.getString(KEY_LAST_SYNC_IP, "").orEmpty(),
         lastSyncCity = prefs.getString(KEY_LAST_SYNC_CITY, "").orEmpty(),
         lastSyncRegion = prefs.getString(KEY_LAST_SYNC_REGION, "").orEmpty(),
@@ -56,6 +74,15 @@ object ProfileStore {
             .putBoolean(KEY_LOCATION_ENABLED, profile.locationEnabled)
             .putString(KEY_LATITUDE, profile.latitude.toString())
             .putString(KEY_LONGITUDE, profile.longitude.toString())
+            .putBoolean(KEY_GEOCODER_ENABLED, profile.geocoderEnabled)
+            .putBoolean(KEY_WIFI_ENABLED, profile.wifiEnabled)
+            .putString(KEY_WIFI_SSID, profile.wifiSsid)
+            .putString(KEY_WIFI_BSSID, profile.wifiBssid.lowercase())
+            .putBoolean(KEY_TELEPHONY_ENABLED, profile.telephonyEnabled)
+            .putString(KEY_MCC, profile.mcc)
+            .putString(KEY_MNC, profile.mnc)
+            .putString(KEY_OPERATOR_NAME, profile.operatorName)
+            .putString(KEY_RADIO_SOURCE, profile.radioSource)
             .putString(KEY_LAST_SYNC_IP, profile.lastSyncIp)
             .putString(KEY_LAST_SYNC_CITY, profile.lastSyncCity)
             .putString(KEY_LAST_SYNC_REGION, profile.lastSyncRegion)
