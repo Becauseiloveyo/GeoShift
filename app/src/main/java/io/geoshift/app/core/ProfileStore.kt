@@ -22,6 +22,7 @@ object ProfileStore {
     const val KEY_WIFI_SSID = "wifi_ssid"
     const val KEY_WIFI_BSSID = "wifi_bssid"
     const val KEY_WIFI_RSSI = "wifi_rssi_dbm"
+    const val KEY_WIFI_ACCESS_POINTS = "wifi_access_points"
     const val KEY_TELEPHONY_ENABLED = "telephony_enabled"
     const val KEY_MCC = "mcc"
     const val KEY_MNC = "mnc"
@@ -54,6 +55,7 @@ object ProfileStore {
         wifiSsid = prefs.getString(KEY_WIFI_SSID, "").orEmpty(),
         wifiBssid = prefs.getString(KEY_WIFI_BSSID, "").orEmpty(),
         wifiRssiDbm = prefs.getInt(KEY_WIFI_RSSI, -45),
+        wifiAccessPoints = WifiAccessPointCodec.decode(prefs.getString(KEY_WIFI_ACCESS_POINTS, null)),
         telephonyEnabled = prefs.getBoolean(KEY_TELEPHONY_ENABLED, false),
         mcc = prefs.getString(KEY_MCC, "").orEmpty(),
         mnc = prefs.getString(KEY_MNC, "").orEmpty(),
@@ -87,6 +89,7 @@ object ProfileStore {
             .putString(KEY_WIFI_SSID, profile.wifiSsid)
             .putString(KEY_WIFI_BSSID, profile.wifiBssid.lowercase())
             .putInt(KEY_WIFI_RSSI, profile.wifiRssiDbm)
+            .putString(KEY_WIFI_ACCESS_POINTS, WifiAccessPointCodec.encode(profile.wifiAccessPoints))
             .putBoolean(KEY_TELEPHONY_ENABLED, profile.telephonyEnabled)
             .putString(KEY_MCC, profile.mcc)
             .putString(KEY_MNC, profile.mnc)
