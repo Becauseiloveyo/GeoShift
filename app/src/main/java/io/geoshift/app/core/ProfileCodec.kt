@@ -25,7 +25,21 @@ object ProfileCodec {
             put("wifiSsid", profile.wifiSsid)
             put("wifiBssid", profile.wifiBssid)
             put("wifiRssiDbm", profile.wifiRssiDbm)
-            put("wifiAccessPoints", JSONArray(WifiAccessPointCodec.encode(profile.wifiAccessPoints)))
+            put("wifiAccessPoints", JSONArray().apply {
+                profile.wifiAccessPoints
+                    .asSequence()
+                    .filter { it.isValid() }
+                    .distinctBy { it.bssid.lowercase() }
+                    .take(GeoProfile.MAX_WIFI_ACCESS_POINTS)
+                    .forEach { point ->
+                        put(JSONObject().apply {
+                            put("ssid", point.ssid)
+                            put("bssid", point.bssid.lowercase())
+                            put("rssiDbm", point.rssiDbm)
+                            put("frequencyMhz", point.frequencyMhz)
+                        })
+                    }
+            })
             put("telephonyEnabled", profile.telephonyEnabled)
             put("mcc", profile.mcc)
             put("mnc", profile.mnc)
@@ -63,7 +77,7 @@ object ProfileCodec {
             wifiSsid = json.optString("wifiSsid", ""),
             wifiBssid = json.optString("wifiBssid", ""),
             wifiRssiDbm = json.optInt("wifiRssiDbm", -45),
-            wifiAccessPoints = WifiAccessPointCodec.decode(json.optJSONArray("wifiAccessPoints")?.toString()),
+            wifiAccessPoints = decodeAccessPoints(json.optJSONArray("wifiAccessPoints")),
             telephonyEnabled = json.optBoolean("telephonyEnabled", false),
             mcc = json.optString("mcc", ""),
             mnc = json.optString("mnc", ""),
@@ -77,5 +91,21 @@ object ProfileCodec {
             lastSyncRegion = json.optString("lastSyncRegion", ""),
             lastSyncAtEpochMs = json.optLong("lastSyncAtEpochMs", 0L),
         )
+    }
+
+    private fun decodeAccessPoints(array: JSONArray?): List<WifiAccessPointProfile> {
+        if (array == null) return emptyList()
+        return buildList {
+            for (index in 0 until minOf(array.length(), GeoProfile.MAX_WIFI_ACCESS_POINTS)) {
+                val item = array.optJSONObject(index) ?: continue
+                val point = WifiAccessPointProfile(
+                    ssid = item.optString("ssid", ""),
+                    bssid = item.optString("bssid", "").lowercase(),
+                    rssiDbm = item.optInt("rssiDbm", -55),
+                    frequencyMhz = item.optInt("frequencyMhz", 5200),
+                )
+                if (point.isValid()) add(point)
+            }
+        }.distinctBy { it.bssid.lowercase() }
     }
 }
