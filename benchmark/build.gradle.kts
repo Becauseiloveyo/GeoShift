@@ -15,9 +15,22 @@ android {
     targetProjectPath = ":app"
     experimentalProperties["android.experimental.self-instrumenting"] = true
 
+    buildTypes {
+        create("benchmark") {
+            isDebuggable = true
+            matchingFallbacks += listOf("release")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
+    }
+}
+
+androidComponents {
+    beforeVariants(selector().all()) {
+        enabled = buildType == "benchmark"
     }
 }
 
