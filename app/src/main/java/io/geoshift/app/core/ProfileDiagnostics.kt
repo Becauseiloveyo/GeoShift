@@ -23,6 +23,22 @@ object ProfileDiagnostics {
             add(Issue(Severity.WARNING, "Location is 0,0; set a real test location or synchronize from GeoIP"))
         }
 
+        if (profile.geocoderEnabled && !profile.locationEnabled) {
+            add(Issue(Severity.WARNING, "Geocoder override is enabled while location override is disabled"))
+        }
+
+        if (profile.wifiEnabled && profile.wifiSsid.isBlank() && profile.wifiBssid.isBlank()) {
+            add(Issue(Severity.WARNING, "Wi-Fi override is enabled but no SSID/BSSID is configured"))
+        }
+
+        if (profile.telephonyEnabled && profile.mcc.isBlank() && profile.mnc.isBlank()) {
+            add(Issue(Severity.WARNING, "Telephony override is enabled but MCC/MNC is not configured"))
+        }
+
+        if ((profile.wifiEnabled || profile.telephonyEnabled) && profile.radioSource.isBlank()) {
+            add(Issue(Severity.WARNING, "Radio identity has no recorded source; verify it matches the selected location"))
+        }
+
         if (profile.followVpn && profile.lastSyncIp.isBlank()) {
             add(Issue(Severity.WARNING, "Follow VPN is enabled but no successful exit-IP sync is recorded"))
         }
