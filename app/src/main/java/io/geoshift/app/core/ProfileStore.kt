@@ -17,6 +17,10 @@ object ProfileStore {
     const val KEY_LOCATION_ENABLED = "location_enabled"
     const val KEY_LATITUDE = "latitude"
     const val KEY_LONGITUDE = "longitude"
+    const val KEY_LAST_SYNC_IP = "last_sync_ip"
+    const val KEY_LAST_SYNC_CITY = "last_sync_city"
+    const val KEY_LAST_SYNC_REGION = "last_sync_region"
+    const val KEY_LAST_SYNC_AT = "last_sync_at"
 
     fun load(service: XposedService): GeoProfile = load(service.getRemotePreferences(REMOTE_PREFS))
 
@@ -32,6 +36,10 @@ object ProfileStore {
         locationEnabled = prefs.getBoolean(KEY_LOCATION_ENABLED, true),
         latitude = prefs.getString(KEY_LATITUDE, "0.0")?.toDoubleOrNull() ?: 0.0,
         longitude = prefs.getString(KEY_LONGITUDE, "0.0")?.toDoubleOrNull() ?: 0.0,
+        lastSyncIp = prefs.getString(KEY_LAST_SYNC_IP, "").orEmpty(),
+        lastSyncCity = prefs.getString(KEY_LAST_SYNC_CITY, "").orEmpty(),
+        lastSyncRegion = prefs.getString(KEY_LAST_SYNC_REGION, "").orEmpty(),
+        lastSyncAtEpochMs = prefs.getLong(KEY_LAST_SYNC_AT, 0L),
     )
 
     fun save(service: XposedService, profile: GeoProfile): Boolean {
@@ -48,6 +56,10 @@ object ProfileStore {
             .putBoolean(KEY_LOCATION_ENABLED, profile.locationEnabled)
             .putString(KEY_LATITUDE, profile.latitude.toString())
             .putString(KEY_LONGITUDE, profile.longitude.toString())
+            .putString(KEY_LAST_SYNC_IP, profile.lastSyncIp)
+            .putString(KEY_LAST_SYNC_CITY, profile.lastSyncCity)
+            .putString(KEY_LAST_SYNC_REGION, profile.lastSyncRegion)
+            .putLong(KEY_LAST_SYNC_AT, profile.lastSyncAtEpochMs)
             .apply()
         return true
     }
