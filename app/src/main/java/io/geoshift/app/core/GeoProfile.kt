@@ -19,10 +19,14 @@ data class GeoProfile(
     val wifiEnabled: Boolean = false,
     val wifiSsid: String = "",
     val wifiBssid: String = "",
+    val wifiRssiDbm: Int = -45,
     val telephonyEnabled: Boolean = false,
     val mcc: String = "",
     val mnc: String = "",
     val operatorName: String = "",
+    val cellRadio: String = "",
+    val cellAreaCode: Long = -1L,
+    val cellId: Long = -1L,
     val radioSource: String = "",
     val lastSyncIp: String = "",
     val lastSyncCity: String = "",
@@ -49,6 +53,9 @@ data class GeoProfile(
         if (wifiEnabled && wifiBssid.isNotBlank() && !wifiBssid.matches(BSSID_PATTERN)) {
             add("Wi-Fi BSSID must be a MAC address")
         }
+        if (wifiEnabled && wifiRssiDbm !in -127..0) {
+            add("Wi-Fi RSSI must be between -127 and 0 dBm")
+        }
         if (telephonyEnabled && mcc.isNotBlank() && !mcc.matches(Regex("\\d{3}"))) {
             add("MCC must contain 3 digits")
         }
@@ -58,6 +65,8 @@ data class GeoProfile(
         if (telephonyEnabled && (mcc.isBlank() xor mnc.isBlank())) {
             add("MCC and MNC must be configured together")
         }
+        if (telephonyEnabled && cellAreaCode < -1L) add("Cell area code cannot be below -1")
+        if (telephonyEnabled && cellId < -1L) add("Cell ID cannot be below -1")
         if (lastSyncAtEpochMs < 0L) add("Last sync timestamp cannot be negative")
     }
 
