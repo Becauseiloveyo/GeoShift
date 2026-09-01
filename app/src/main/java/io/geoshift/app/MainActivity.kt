@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
     private var providerSettings by mutableStateOf(ProviderSettings.Snapshot())
     private var syncStatus by mutableStateOf("No synchronization yet")
     private var radioStatus by mutableStateOf("Radio providers not configured")
+    private var notice by mutableStateOf<String?>(null)
     private var syncInFlight by mutableStateOf(false)
     private var radioQueryInFlight by mutableStateOf(false)
     private var editingProfile by mutableStateOf<GeoProfile?>(null)
@@ -65,7 +66,7 @@ class MainActivity : ComponentActivity() {
             contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use {
                 it.write(ProfileCodec.encode(profile))
             } ?: error("Could not open export destination")
-        }.onSuccess { toast("Profile exported") }
+        }.onSuccess { showNotice("Profile exported") }
             .onFailure { toast("Export failed: ${it.message}") }
     }
 
@@ -87,7 +88,7 @@ class MainActivity : ComponentActivity() {
                 destination = Destination.Profiles
                 editingProfile = imported
                 editingOriginalPackage = imported.targetPackage
-                toast("Profile imported")
+                showNotice("Profile imported")
             }
         }.onFailure { toast("Import failed: ${it.message}") }
     }
@@ -124,6 +125,7 @@ class MainActivity : ComponentActivity() {
                         providerSettings = providerSettings,
                         syncStatus = if (serviceConnected) "$serviceLabel · $syncStatus" else serviceLabel,
                         radioStatus = radioStatus,
+                        notice = notice,
                         isSyncing = syncInFlight,
                         isRadioBusy = radioQueryInFlight,
                         editingProfile = editingProfile,
@@ -145,6 +147,8 @@ class MainActivity : ComponentActivity() {
                         importProfile = { importLauncher.launch(arrayOf("application/json", "text/json")) },
                         saveProviders = ::saveProviderSettings,
                         previewRadio = ::previewRadioEnvironment,
+                        applyRadioSuggestion = ::applyRadioSuggestion,
+                        clearNotice = { notice = null },
                     ),
                 )
             }
@@ -201,7 +205,7 @@ class MainActivity : ComponentActivity() {
         refreshProfiles(service)
         if (profile.enabled && profile.followVpn) updateFollowService(requestPermission = true)
         closeEditor()
-        toast("Profile saved")
+        showNotice("Profile saved")
     }
 
     private fun toggleProfile(profile: GeoProfile) {
@@ -215,7 +219,7 @@ class MainActivity : ComponentActivity() {
         if (ProfileStoreV2.delete(service, packageName)) {
             refreshProfiles(service)
             closeEditor()
-            toast("Profile deleted")
+            showNotice("Profile deleted")
         }
     }
 
@@ -237,9 +241,13 @@ class MainActivity : ComponentActivity() {
                     editingOriginalPackage = outcome.profile.targetPackage
                     syncStatus = "${outcome.geoIp.ip} · ${outcome.geoIp.city}, ${outcome.geoIp.countryCode}"
                     refreshProfiles(service)
+                    showNotice("Profile synchronized with VPN exit")
                 }
             } catch (error: Throwable) {
-                runOnUiThread { syncStatus = "Sync failed: ${error.message ?: error.javaClass.simpleName}" }
+                runOnUiThread {
+                    syncStatus = "Sync failed: ${error.message ?: error.javaClass.simpleName}"
+                    showNotice(syncStatus)
+                }
             } finally {
                 runOnUiThread { syncInFlight = false }
             }
@@ -265,9 +273,13 @@ class MainActivity : ComponentActivity() {
                 runOnUiThread {
                     syncStatus = "Synced $saved/${followed.size} · ${geoIp.ip} · ${geoIp.city}, ${geoIp.countryCode}"
                     refreshProfiles(service)
+                    showNotice("Synchronized $saved Follow VPN profiles")
                 }
             } catch (error: Throwable) {
-                runOnUiThread { syncStatus = "Sync failed: ${error.message ?: error.javaClass.simpleName}" }
+                runOnUiThread {
+                    syncStatus = "Sync failed: ${error.message ?: error.javaClass.simpleName}"
+                    showNotice(syncStatus)
+                }
             } finally {
                 runOnUiThread { syncInFlight = false }
             }
@@ -280,7 +292,7 @@ class MainActivity : ComponentActivity() {
         if (pkg.isBlank()) return toast("Choose an app first")
         service.requestScope(listOf(pkg), object : XposedService.OnScopeEventListener {
             override fun onScopeRequestApproved(approved: List<String>) {
-                runOnUiThread { toast("Scope approved: ${approved.joinToString()}") }
+                runOnUiThread { showNotice("Scope approved: ${approved.joinToString()}") }
             }
 
             override fun onScopeRequestFailed(message: String) {
@@ -304,7 +316,7 @@ class MainActivity : ComponentActivity() {
         ProviderSettings.save(this, settings)
         providerSettings = ProviderSettings.load(this)
         updateProviderStatus()
-        toast("Provider settings saved locally")
+        showNotice("Provider settings saved locally")
     }
 
     private fun updateProviderStatus() {
@@ -329,6 +341,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun previewRadioEnvironment() {
+        queryRadioEnvironment(apply = false)
+    }
+
+    private fun applyRadioSuggestion() {
+        queryRadioEnvironment(apply = true)
+    }
+
+    private fun queryRadioEnvironment(apply: Boolean) {
         if (radioQueryInFlight) return
         val provider = buildRadioProvider() ?: return toast("Configure at least one provider first")
         val profile = profiles.maxByOrNull { it.lastSyncAtEpochMs }
@@ -342,17 +362,49 @@ class MainActivity : ComponentActivity() {
             try {
                 val wifi = provider.nearbyWifi(profile.latitude, profile.longitude, 750)
                 val cells = provider.nearbyCells(profile.latitude, profile.longitude, 900)
-                val wifiPreview = wifi.take(3).joinToString { it.ssid?.ifBlank { it.bssid } ?: it.bssid }
-                val cellPreview = cells.take(3).joinToString { "${it.radio} ${it.mcc}/${it.mnc}/${it.areaCode}/${it.cellId}" }
-                runOnUiThread {
-                    radioStatus = buildString {
-                        append("${wifi.size} Wi-Fi · ${cells.size} cells")
-                        if (wifiPreview.isNotBlank()) append(" · $wifiPreview")
-                        if (cellPreview.isNotBlank()) append(" · $cellPreview")
+                if (apply) {
+                    val service = GeoShiftApp.service ?: error("LSPosed service is not connected")
+                    val nearestWifi = wifi.firstOrNull()
+                    val nearestCell = cells.firstOrNull()
+                    if (nearestWifi == null && nearestCell == null) error("No nearby radio records were returned")
+                    val source = listOfNotNull(nearestWifi?.source, nearestCell?.source)
+                        .filter { it.isNotBlank() }
+                        .distinct()
+                        .joinToString(" + ")
+                    val updated = profile.copy(
+                        wifiEnabled = nearestWifi != null,
+                        wifiSsid = nearestWifi?.ssid.orEmpty(),
+                        wifiBssid = nearestWifi?.bssid.orEmpty(),
+                        telephonyEnabled = nearestCell != null,
+                        mcc = nearestCell?.mcc?.toString()?.padStart(3, '0').orEmpty(),
+                        mnc = nearestCell?.mnc?.toString()?.padStart(2, '0').orEmpty(),
+                        radioSource = source.ifBlank { "provider suggestion" },
+                    )
+                    val errors = updated.validate()
+                    if (errors.isNotEmpty()) error(errors.first())
+                    if (!ProfileStoreV2.save(service, updated)) error("Could not save radio suggestion")
+                    runOnUiThread {
+                        refreshProfiles(service)
+                        editingProfile = editingProfile?.takeIf { it.targetPackage != updated.targetPackage } ?: updated
+                        radioStatus = "Applied ${if (nearestWifi != null) "Wi-Fi" else ""}${if (nearestWifi != null && nearestCell != null) " + " else ""}${if (nearestCell != null) "cell identity" else ""} to ${updated.targetPackage}"
+                        showNotice("Applied nearby radio identity to ${appLabelFor(updated.targetPackage)}")
+                    }
+                } else {
+                    val wifiPreview = wifi.take(3).joinToString { it.ssid?.ifBlank { it.bssid } ?: it.bssid }
+                    val cellPreview = cells.take(3).joinToString { "${it.radio} ${it.mcc}/${it.mnc}/${it.areaCode}/${it.cellId}" }
+                    runOnUiThread {
+                        radioStatus = buildString {
+                            append("${wifi.size} Wi-Fi · ${cells.size} cells")
+                            if (wifiPreview.isNotBlank()) append(" · $wifiPreview")
+                            if (cellPreview.isNotBlank()) append(" · $cellPreview")
+                        }
                     }
                 }
             } catch (error: Throwable) {
-                runOnUiThread { radioStatus = "Provider query failed: ${error.message ?: error.javaClass.simpleName}" }
+                runOnUiThread {
+                    radioStatus = "Provider query failed: ${error.message ?: error.javaClass.simpleName}"
+                    if (apply) showNotice(radioStatus)
+                }
             } finally {
                 runOnUiThread { radioQueryInFlight = false }
             }
@@ -361,6 +413,7 @@ class MainActivity : ComponentActivity() {
 
     private fun updateFollowService(requestPermission: Boolean) {
         val shouldRun = profiles.any { it.enabled && it.followVpn }
+        RuntimeState.setFollowEnabled(this, shouldRun)
         if (shouldRun) {
             if (requestPermission) requestNotificationPermissionIfUseful()
             VpnFollowService.start(this)
@@ -393,6 +446,9 @@ class MainActivity : ComponentActivity() {
             .sortedBy { it.label.lowercase() }
     }
 
+    private fun appLabelFor(packageName: String): String =
+        launchableApps.firstOrNull { it.packageName == packageName }?.label ?: packageName
+
     private fun formatLastSync(profile: GeoProfile): String {
         val whenText = if (profile.lastSyncAtEpochMs > 0L) {
             DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
@@ -402,6 +458,10 @@ class MainActivity : ComponentActivity() {
             .filter { it.isNotBlank() }
             .joinToString(", ")
         return "Last sync ${profile.lastSyncIp} · $place · $whenText"
+    }
+
+    private fun showNotice(message: String) {
+        notice = message
     }
 
     private fun toast(message: String) {
