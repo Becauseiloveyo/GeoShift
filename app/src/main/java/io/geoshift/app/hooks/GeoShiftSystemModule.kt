@@ -9,14 +9,7 @@ import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam
 import java.util.concurrent.atomic.AtomicReference
 
-/**
- * v0.4 system-process foundation.
- *
- * This first stage deliberately installs no system method hooks. It only verifies
- * system/remote capabilities, keeps an immutable in-memory profile snapshot and
- * probes AOSP/HyperOS classes. Delivery hooks are added after this foundation is
- * validated on-device.
- */
+/** v0.4 system-process foundation and conservative direct-framework delivery layer. */
 class GeoShiftSystemModule : XposedModule() {
     companion object {
         private const val TAG = "GeoShiftSystem"
@@ -52,6 +45,24 @@ class GeoShiftSystemModule : XposedModule() {
             Log.INFO,
             TAG,
             "v0.4 system foundation ready; profiles=${runtime.get().profiles.size}; ${capabilities.summary()}",
+        )
+
+        val systemContext = SystemContextProvider.get()
+        if (systemContext == null) {
+            log(Log.WARN, TAG, "System context unavailable; delivery hooks skipped to preserve package/UID verification")
+            return
+        }
+
+        val report = SystemLocationDeliveryHooks(
+            module = this,
+            classLoader = param.classLoader,
+            context = systemContext,
+            snapshot = runtime::get,
+        ).install()
+        log(
+            Log.INFO,
+            TAG,
+            "Direct framework delivery hooks: last=${report.lastLocationHooks}, current=${report.currentLocationHooks}, listener=${report.listenerHooks}",
         )
     }
 
