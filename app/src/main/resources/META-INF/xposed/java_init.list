@@ -1,1 +1,2 @@
 io.geoshift.app.hooks.GeoShiftModule
+io.geoshift.app.hooks.GeoShiftSystemModule
