@@ -4,7 +4,6 @@ import android.content.Context
 import android.location.Location
 import android.os.Binder
 import android.os.Build
-import android.os.UserHandle
 import android.util.Log
 import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.SystemRuntimeSnapshot
@@ -134,7 +133,7 @@ internal class SystemLocationDeliveryHooks(
             .getOrElse { return null }
         if (packages.isEmpty()) return null
 
-        val userId = UserHandle.getUserId(uid)
+        val userId = userIdFromUid(uid)
         val strings = args.filterIsInstance<String>()
         return SystemProfileSelector.select(current, userId, packages, strings)
     }
@@ -144,9 +143,12 @@ internal class SystemLocationDeliveryHooks(
         else Binder.getCallingUid()
     }.getOrNull()?.takeIf { it >= 0 }
 
+    private fun userIdFromUid(uid: Int): Int = uid / PER_USER_RANGE
+
     private fun Method.signature(): String = "$name(${parameterTypes.joinToString { it.simpleName }})"
 
     companion object {
         private const val TAG = "GeoShiftSystem"
+        private const val PER_USER_RANGE = 100_000
     }
 }
