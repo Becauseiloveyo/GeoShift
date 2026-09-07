@@ -52,6 +52,8 @@ When explicitly armed for an existing enabled location profile, strict mode also
 
 Strict mode also sanitizes the copied Android 12+ `Location.isMock` flag. Original provider timing, accuracy and other copied metadata remain intact unless a profile-owned field is explicitly replaced.
 
+**Strict mode is a shared system location session, not a guaranteed per-app isolation mode.** It exists specifically for broker/Fused paths where the final app identity may have been lost before the update reaches `system_server`. Stop the session after the map compatibility test.
+
 #### Shell/root-only control during this validation milestone
 
 The temporary command receiver is protected by `android.permission.DUMP`, so ordinary third-party apps cannot arm the provider-global session.
