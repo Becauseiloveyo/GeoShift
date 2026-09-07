@@ -11,6 +11,10 @@ import java.util.concurrent.ConcurrentHashMap
 class GeoShiftApp : Application(), XposedServiceHelper.OnServiceListener {
     companion object {
         private const val TAG = "GeoShiftScope"
+        private val REQUIRED_BROKER_SCOPES = setOf(
+            "com.android.location.fused",
+            "com.xiaomi.location.fused",
+        )
 
         @Volatile
         var service: XposedService? = null
@@ -48,19 +52,23 @@ class GeoShiftApp : Application(), XposedServiceHelper.OnServiceListener {
     private fun requestMissingProfileScopes(service: XposedService) {
         runCatching {
             val currentScope = service.scope.toHashSet()
-            val missing = ProfileStoreV2.list(service)
+            val profileTargets = ProfileStoreV2.list(service)
                 .asSequence()
                 .filter { it.enabled }
                 .map { it.targetPackage.trim() }
                 .filter { it.isNotBlank() }
+                .toSet()
+
+            val missing = (profileTargets + REQUIRED_BROKER_SCOPES)
+                .asSequence()
                 .filter { it !in currentScope }
                 .filter { requestedScopes.add(it) }
-                .distinct()
+                .sorted()
                 .toList()
 
             if (missing.isEmpty()) return
 
-            Log.i(TAG, "Requesting missing profile scopes: ${missing.joinToString()}")
+            Log.i(TAG, "Requesting missing GeoShift scopes: ${missing.joinToString()}")
             service.requestScope(missing, object : XposedService.OnScopeEventListener {
                 override fun onScopeRequestApproved(approved: List<String>) {
                     Log.i(TAG, "Scope request approved: ${approved.joinToString()}")
@@ -72,7 +80,7 @@ class GeoShiftApp : Application(), XposedServiceHelper.OnServiceListener {
                 }
             })
         }.onFailure {
-            Log.w(TAG, "Unable to reconcile profile scopes", it)
+            Log.w(TAG, "Unable to reconcile profile/broker scopes", it)
         }
     }
 }
