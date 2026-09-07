@@ -12,8 +12,8 @@ android {
         applicationId = "io.geoshift.app"
         minSdk = 29
         targetSdk = 37
-        versionCode = 10
-        versionName = "0.4.2-dev"
+        versionCode = 11
+        versionName = "0.4.3-dev"
     }
 
     buildFeatures {
