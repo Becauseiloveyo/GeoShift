@@ -1,3 +1,4 @@
 system
 com.android.phone
+com.android.location.fused
 com.xiaomi.location.fused
