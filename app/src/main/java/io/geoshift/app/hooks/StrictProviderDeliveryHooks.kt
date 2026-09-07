@@ -7,6 +7,7 @@ import io.geoshift.app.core.SystemRuntimeSnapshot
 import io.github.libxposed.api.XposedModule
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Provider-global delivery rewrite used only while an explicit Strict Map Session is armed.
@@ -26,6 +27,9 @@ internal class StrictProviderDeliveryHooks(
     ) {
         val total: Int get() = providerHooks + gnssHooks
     }
+
+    private val loggedRewriteHits = ConcurrentHashMap.newKeySet<String>()
+    private val loggedNoRewriteHits = ConcurrentHashMap.newKeySet<String>()
 
     fun install(): InstallReport {
         val provider = hookClass(
@@ -71,7 +75,27 @@ internal class StrictProviderDeliveryHooks(
                             }
                         }
 
-                        if (changed) chain.proceed(forwarded) else chain.proceed()
+                        val signature = method.signature()
+                        if (changed) {
+                            if (loggedRewriteHits.add(signature)) {
+                                module.log(
+                                    Log.INFO,
+                                    TAG,
+                                    "Strict provider path hit and rewrote location: $signature -> ${profile.targetPackage}",
+                                )
+                            }
+                            chain.proceed(forwarded)
+                        } else {
+                            if (loggedNoRewriteHits.add(signature)) {
+                                val shapes = forwarded.joinToString { value -> value?.javaClass?.name ?: "null" }
+                                module.log(
+                                    Log.DEBUG,
+                                    TAG,
+                                    "Strict provider hook invoked without a recognized location value: $signature args=[$shapes]",
+                                )
+                            }
+                            chain.proceed()
+                        }
                     }
                     installed++
                 }.onFailure {
