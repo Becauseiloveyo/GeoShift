@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="could_not_open_export">Could not open export destination</string>
+    <string name="could_not_read_profile">Could not read profile file</string>
+    <string name="could_not_save_profile">Could not save profile</string>
+    <string name="could_not_update_profile">Could not update profile</string>
+    <string name="could_not_save_synced_profile">Could not save synchronized profile</string>
+    <string name="could_not_save_radio">Could not save radio suggestion</string>
+</resources>

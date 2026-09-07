@@ -1,0 +1,3 @@
+io.geoshift.app.hooks.GeoShiftModule
+io.geoshift.app.hooks.GeoShiftStrictPackageModule
+io.geoshift.app.hooks.GeoShiftSystemModule

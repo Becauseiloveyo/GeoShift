@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="editor_mode_basic">Basic</string>
+    <string name="editor_mode_advanced">Advanced</string>
+    <string name="editor_mode_desc">Basic keeps the common workflow compact. Advanced exposes raw radio and regional fields.</string>
+    <string name="profile_health">Profile health</string>
+    <string name="health_score">Consistency %1$d%%</string>
+    <string name="health_map_ready">Map location ready</string>
+    <string name="health_map_not_ready">Map location incomplete</string>
+    <string name="health_wifi_ready">Wi-Fi scan ready · %1$d APs</string>
+    <string name="health_wifi_not_ready">Wi-Fi environment incomplete</string>
+    <string name="health_cell_ready">Cell identity ready</string>
+    <string name="health_cell_basic">Cell identity basic only</string>
+    <string name="nearby_access_points">Nearby access points</string>
+    <string name="nearby_access_points_count">%1$d access points stored in this profile</string>
+    <string name="advanced_radio_fields">Advanced radio fields</string>
+    <string name="wifi_rssi">Wi-Fi RSSI (dBm)</string>
+    <string name="cell_radio">Radio type</string>
+    <string name="cell_area_code">TAC / LAC</string>
+    <string name="cell_id">Cell ID / NCI</string>
+    <string name="compatibility_note">LocationManager is covered directly. Google LocationResult, AMap and Baidu adapters activate when those SDK classes are present in the target app.</string>
+</resources>

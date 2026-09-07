@@ -1,0 +1,42 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: "15859902"
+          packages: "platform-tools"
+      - name: Install Android API 37 SDK
+        run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.5.1"
+      - name: Run unit tests
+        run: gradle :app:testDebugUnitTest --stacktrace
+      - name: Compile Macrobenchmark suite
+        run: gradle :app:assembleBenchmark :benchmark:assembleBenchmark --stacktrace
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --stacktrace
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GeoShift-debug-${{ github.sha }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
