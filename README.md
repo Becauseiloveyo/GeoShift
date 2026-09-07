@@ -72,7 +72,7 @@ su -c 'am broadcast -n io.geoshift.app/.StrictSessionCommandReceiver --ez enable
 
 For another Android user/profile, add `--ei user <userId>` to the start command.
 
-A strict session is never automatically restored after reboot. `system_server` records the previous command id as historical state and only arms strict mode after a new post-boot command.
+A strict session is never automatically restored after reboot. On every `system_server` start, GeoShift treats the last persisted command id as historical and requires a new post-boot start command before provider-global rewriting can occur.
 
 During strict-session validation, disable other location-modification Xposed modules first so their system-provider hooks do not contaminate results.
 
