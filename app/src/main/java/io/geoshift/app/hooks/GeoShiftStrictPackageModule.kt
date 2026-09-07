@@ -24,17 +24,31 @@ class GeoShiftStrictPackageModule : XposedModule() {
         val runtime = StrictProcessSession(this, prefs, param.packageName)
         session = runtime // retain the SharedPreferences listener for the lifetime of the process.
 
-        val report = StrictThirdPartyLocationHooks(
+        val thirdParty = StrictThirdPartyLocationHooks(
             module = this,
             classLoader = param.classLoader,
             strictProfile = runtime::profile,
         ).install()
 
-        if (report.amapPresent || param.packageName == XIAOMI_FUSED_PACKAGE) {
+        val fused = StrictFusedProcessHooks(
+            module = this,
+            classLoader = param.classLoader,
+            strictProfile = runtime::profile,
+        ).install()
+
+        if (
+            thirdParty.amapPresent ||
+            fused.providerPresent ||
+            param.packageName == XIAOMI_FUSED_PACKAGE ||
+            param.packageName == AOSP_FUSED_PACKAGE
+        ) {
             log(
                 Log.INFO,
                 TAG,
-                "Strict package adapters in ${param.packageName}: amap=${report.amapPresent}, request=${report.requestHooks}, extra=${report.extraCommandHooks}, offline=${report.offlineHooks}",
+                "Strict package adapters in ${param.packageName}: " +
+                    "amap=${thirdParty.amapPresent}, amapRequest=${thirdParty.requestHooks}, " +
+                    "amapExtra=${thirdParty.extraCommandHooks}, amapOffline=${thirdParty.offlineHooks}, " +
+                    "aospFused=${fused.providerPresent}, chooseBest=${fused.chooseBestHooks}, child=${fused.childListenerHooks}",
             )
         }
     }
@@ -42,5 +56,6 @@ class GeoShiftStrictPackageModule : XposedModule() {
     companion object {
         private const val TAG = "GeoShiftStrict"
         private const val XIAOMI_FUSED_PACKAGE = "com.xiaomi.location.fused"
+        private const val AOSP_FUSED_PACKAGE = "com.android.location.fused"
     }
 }
