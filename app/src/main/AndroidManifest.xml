@@ -51,6 +51,14 @@
             </intent-filter>
         </receiver>
 
+        <!-- Temporary v0.4 developer gate. android.permission.DUMP limits this explicit receiver
+             to shell/system callers so ordinary apps cannot arm a provider-global strict session. -->
+        <receiver
+            android:name=".StrictSessionCommandReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
+
         <service
             android:name=".VpnFollowService"
             android:exported="false"
