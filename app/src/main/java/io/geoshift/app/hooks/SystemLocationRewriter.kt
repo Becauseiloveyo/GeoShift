@@ -3,6 +3,7 @@ package io.geoshift.app.hooks
 import android.location.Location
 import android.os.Build
 import io.geoshift.app.core.GeoProfile
+import io.geoshift.app.core.LocationCallbackPolicy
 
 /**
  * Copies a framework Location and changes only profile-owned coordinates.
@@ -25,7 +26,9 @@ internal object SystemLocationRewriter {
 
     fun rewriteCallbackValue(value: Any?, profile: GeoProfile?): Any? = when (value) {
         is Location -> rewrite(value, profile)
-        is List<*> -> value.map { item ->
+        is List<*> -> if (profile == null || !profile.enabled || !profile.locationEnabled ||
+            value.none { it is Location }
+        ) value else LocationCallbackPolicy.transformList(value) { item ->
             if (item is Location) rewrite(item, profile) else item
         }
         else -> value
