@@ -34,8 +34,9 @@ class StrictSessionCommandReceiver : BroadcastReceiver() {
                 }
 
                 if (enable) {
-                    if (!acknowledgeGlobalImpact ||
-                        durationMs !in 1L..io.geoshift.app.core.StrictSessionPolicy.MAX_DURATION_MS) {
+                    if (!io.geoshift.app.core.StrictSessionPolicy.canArm(
+                        acknowledgeGlobalImpact, durationMs,
+                    )) {
                         Log.w(TAG, "Strict-session start rejected: explicit global-impact acknowledgement and valid TTL required")
                         return@Thread
                     }
