@@ -14,6 +14,8 @@ import android.os.SystemClock
 import android.telephony.TelephonyManager
 import android.util.Log
 import io.geoshift.app.core.GeoProfile
+import io.geoshift.app.core.LocationCallbackPolicy
+import io.geoshift.app.core.LocationListenerRegistry
 import io.geoshift.app.core.AuditOutcome
 import io.geoshift.app.core.ProfileStoreV2
 import io.geoshift.app.core.effectiveWifiAccessPoints
@@ -22,10 +24,8 @@ import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Proxy
 import java.time.ZoneId
-import java.util.Collections
 import java.util.Locale
 import java.util.TimeZone
-import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Consumer
 import kotlin.math.abs
@@ -38,9 +38,7 @@ class GeoShiftModule : XposedModule() {
 
     private var audit: HookAuditEmitter? = null
 
-    private val locationListenerWrappers = Collections.synchronizedMap(
-        WeakHashMap<LocationListener, LocationListener>()
-    )
+    private val locationListenerWrappers = LocationListenerRegistry<LocationListener>()
 
     override fun onPackageReady(param: PackageReadyParam) {
         if (!param.isFirstPackage) return
@@ -145,8 +143,8 @@ class GeoShiftModule : XposedModule() {
                         audit?.emit("framework_last", AuditOutcome.HIT, identityVerified = true)
                         val original = chain.proceed() as? Location
                         val current = profile.get()
-                        val changed = locationForProfile(original, current, synthesize = true)
-                        if (current.isLocationActive() && changed !== original) {
+                        val changed = locationForProfile(original, current)
+                        if (changed !== original) {
                             audit?.emit("framework_last", AuditOutcome.REWRITTEN, identityVerified = true)
                         }
                         changed
@@ -162,20 +160,21 @@ class GeoShiftModule : XposedModule() {
                 .forEach { method ->
                     hook(method).intercept { chain ->
                         audit?.emit("framework_callback", AuditOutcome.HIT, identityVerified = true)
-                        val current = profile.get()
-                        if (!current.isLocationActive()) return@intercept chain.proceed()
+                        if (!profile.get().isLocationActive()) return@intercept chain.proceed()
                         val index = method.parameterTypes.indexOfFirst { Consumer::class.java.isAssignableFrom(it) }
                         val original = chain.args.getOrNull(index) as? Consumer<Any?>
                             ?: return@intercept chain.proceed()
                         val args = chain.args.toTypedArray()
+                        // Never replace a null (timeout, cancellation, unavailable provider)
+                        // with a fabricated successful location.
                         args[index] = Consumer<Any?> { value ->
-                            val currentValue = profile.get()
-                            val rewritten = locationCallbackValue(value, currentValue, synthesizeEmpty = true)
-                            if (currentValue.isLocationActive() && rewritten !== value) {
+                            val rewritten = locationCallbackValue(value, profile.get())
+                            if (rewritten !== value) {
                                 audit?.emit("framework_callback", AuditOutcome.REWRITTEN, identityVerified = true)
                             }
                             original.accept(rewritten)
                         }
+                        // The CancellationSignal and Executor are forwarded unchanged.
                         chain.proceed(args)
                     }
                     audit?.emit("framework_callback", AuditOutcome.INSTALLED)
@@ -192,10 +191,21 @@ class GeoShiftModule : XposedModule() {
                         val index = method.parameterTypes.indexOfFirst { LocationListener::class.java.isAssignableFrom(it) }
                         val original = chain.args.getOrNull(index) as? LocationListener
                             ?: return@intercept chain.proceed()
+                        val wasRegistered = locationListenerWrappers.lookup(original) != null
+                        val wrapper = locationListenerWrappers.getOrCreate(original) {
+                            locationListenerWrapper(original, profile, method.name == "requestSingleUpdate")
+                        }
                         val args = chain.args.toTypedArray()
-                        args[index] = locationListenerWrapper(original, profile)
-                        chain.proceed(args)
+                        args[index] = wrapper
+                        try {
+                            chain.proceed(args)
+                        } catch (error: Throwable) {
+                            // An unsuccessful first registration cannot leak a stale proxy.
+                            if (!wasRegistered) locationListenerWrappers.forgetIfMatches(original, wrapper)
+                            throw error
+                        }
                     }
+                    audit?.emit("framework_callback", AuditOutcome.INSTALLED)
                 }
 
             LocationManager::class.java.methods
@@ -208,11 +218,13 @@ class GeoShiftModule : XposedModule() {
                         val index = method.parameterTypes.indexOfFirst { LocationListener::class.java.isAssignableFrom(it) }
                         val original = chain.args.getOrNull(index) as? LocationListener
                             ?: return@intercept chain.proceed()
+                        val wrapper = locationListenerWrappers.lookup(original) ?: original
                         val args = chain.args.toTypedArray()
-                        args[index] = synchronized(locationListenerWrappers) {
-                            locationListenerWrappers.remove(original)
-                        } ?: original
-                        chain.proceed(args)
+                        args[index] = wrapper
+                        // Retain mapping if the system throws; the caller may retry removal.
+                        val result = chain.proceed(args)
+                        locationListenerWrappers.forgetIfMatches(original, wrapper)
+                        result
                     }
                 }
         }.onFailure {
@@ -225,25 +237,30 @@ class GeoShiftModule : XposedModule() {
     private fun locationListenerWrapper(
         original: LocationListener,
         profile: AtomicReference<GeoProfile?>,
+        oneShot: Boolean,
     ): LocationListener {
-        synchronized(locationListenerWrappers) {
-            locationListenerWrappers[original]?.let { return it }
-            val proxy = Proxy.newProxyInstance(
-                original.javaClass.classLoader,
-                arrayOf(LocationListener::class.java),
-            ) { _, method, args ->
-                val forwarded = args?.map { value ->
-                    locationCallbackValue(value, profile.get(), synthesizeEmpty = false)
-                }?.toTypedArray() ?: emptyArray()
-                try {
-                    method.invoke(original, *forwarded)
-                } catch (error: InvocationTargetException) {
-                    throw error.targetException
+        // Identity is maintained by the registry. A one-shot listener releases its
+        // mapping on first location delivery, including when client code throws.
+        var wrapper: LocationListener? = null
+        val created = Proxy.newProxyInstance(
+            LocationListener::class.java.classLoader,
+            arrayOf(LocationListener::class.java),
+        ) { _, method, args ->
+            val forwarded = args?.map { value ->
+                locationCallbackValue(value, profile.get())
+            }?.toTypedArray() ?: emptyArray()
+            try {
+                method.invoke(original, *forwarded)
+            } catch (error: InvocationTargetException) {
+                throw error.targetException
+            } finally {
+                if (oneShot && method.name == "onLocationChanged") {
+                    wrapper?.let { locationListenerWrappers.forgetIfMatches(original, it) }
                 }
-            } as LocationListener
-            locationListenerWrappers[original] = proxy
-            return proxy
-        }
+            }
+        } as LocationListener
+        wrapper = created
+        return created
     }
 
     private fun installSdkLocationHooks(
@@ -255,12 +272,12 @@ class GeoShiftModule : XposedModule() {
             resultClass.methods.filter { it.name == "getLastLocation" && it.parameterCount == 0 }.forEach { method ->
                 hook(method).intercept { chain ->
                     val original = chain.proceed() as? Location
-                    locationForProfile(original, profile.get(), synthesize = true)
+                    locationForProfile(original, profile.get())
                 }
             }
             resultClass.methods.filter { it.name == "getLocations" && it.parameterCount == 0 }.forEach { method ->
                 hook(method).intercept { chain ->
-                    locationCallbackValue(chain.proceed(), profile.get(), synthesizeEmpty = true)
+                    locationCallbackValue(chain.proceed(), profile.get())
                 }
             }
         }.onFailure { log(Log.DEBUG, TAG, "Google LocationResult not present or hook skipped", it) }
@@ -288,36 +305,27 @@ class GeoShiftModule : XposedModule() {
         }.onFailure { log(Log.DEBUG, TAG, "$className not present or hook skipped", it) }
     }
 
-    private fun locationCallbackValue(value: Any?, current: GeoProfile?, synthesizeEmpty: Boolean): Any? {
+    private fun locationCallbackValue(value: Any?, current: GeoProfile?): Any? {
         if (!current.isLocationActive()) return value
         return when (value) {
-            null -> if (synthesizeEmpty) locationForProfile(null, current, synthesize = true) else null
-            is Location -> locationForProfile(value, current, synthesize = true)
-            is List<*> -> {
-                if (value.isEmpty() && synthesizeEmpty) listOf(locationForProfile(null, current, synthesize = true))
-                else value.map { item ->
-                    if (item is Location) locationForProfile(item, current, synthesize = true) else item
-                }
+            null -> null
+            is Location -> locationForProfile(value, current)
+            is List<*> -> LocationCallbackPolicy.transformList(value) { item ->
+                if (item is Location) locationForProfile(item, current) else item
             }
             else -> value
         }
     }
 
-    private fun locationForProfile(original: Location?, current: GeoProfile?, synthesize: Boolean): Location? {
-        if (!current.isLocationActive()) return original
-        if (original == null && !synthesize) return null
-        val result = original?.let(::Location) ?: Location(LocationManager.GPS_PROVIDER).apply {
-            accuracy = 5f
-            time = System.currentTimeMillis()
-            setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos())
+    private fun locationForProfile(original: Location?, current: GeoProfile?): Location? =
+        LocationCallbackPolicy.transform(original) { source ->
+            if (!current.isLocationActive()) source
+            else Location(source).apply {
+                latitude = current!!.latitude
+                longitude = current.longitude
+                if (!hasAccuracy()) accuracy = 5f
+            }
         }
-        result.latitude = current!!.latitude
-        result.longitude = current.longitude
-        if (result.time <= 0L) result.time = System.currentTimeMillis()
-        if (result.elapsedRealtimeNanos <= 0L) result.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos())
-        if (!result.hasAccuracy()) result.accuracy = 5f
-        return result
-    }
 
     private fun installGeocoderHooks(profile: AtomicReference<GeoProfile?>) {
         runCatching {
