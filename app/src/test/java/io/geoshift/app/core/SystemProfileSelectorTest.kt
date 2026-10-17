@@ -30,6 +30,30 @@ class SystemProfileSelectorTest {
     }
 
     @Test
+    fun ambiguousSharedUidAndUserMismatchFailClosed() {
+        val first = GeoProfile(targetPackage = "com.example.first")
+        val second = GeoProfile(targetPackage = "com.example.second")
+        val snapshot = SystemRuntimeSnapshot.fromLegacyProfiles(listOf(first, second))
+        val ambiguous = SystemProfileSelector.select(
+            snapshot, userId = 0,
+            ownedPackages = setOf("com.example.first", "com.example.second"),
+            stringArguments = listOf("com.example.first", "com.example.second"),
+        )
+        assertNull(ambiguous)
+        val one = SystemProfileSelector.select(
+            snapshot, userId = 0,
+            ownedPackages = setOf("com.example.first", "com.example.second"),
+            stringArguments = listOf("com.example.first", "com.example.first"),
+        )
+        assertEquals(ProfileKey.legacy("com.example.first"), one?.profileKey)
+        assertNull(SystemProfileSelector.select(
+            snapshot, userId = 10,
+            ownedPackages = setOf("com.example.first"),
+            stringArguments = listOf("com.example.first"),
+        ))
+    }
+
+    @Test
     fun strictSessionCannotBypassPackageIdentity() {
         val profile = GeoProfile(targetPackage = "com.example.map")
         val strict = SystemRuntimeSnapshot.fromLegacyProfiles(listOf(profile))
