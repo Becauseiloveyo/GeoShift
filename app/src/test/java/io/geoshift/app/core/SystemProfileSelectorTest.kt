@@ -31,7 +31,7 @@ class SystemProfileSelectorTest {
     }
 
     @Test
-    fun strictSessionWinsWithoutPretendingToBePerApp() {
+    fun strictSessionCannotBypassPackageIdentity() {
         val profile = GeoProfile(targetPackage = "com.example.map")
         val strict = SystemRuntimeSnapshot.fromLegacyProfiles(listOf(profile))
             .armStrictSession(ProfileKey.legacy("com.example.map"), 1L)
@@ -43,7 +43,15 @@ class SystemProfileSelectorTest {
             stringArguments = emptyList(),
         )
 
-        assertEquals(ProfileKey.legacy("com.example.map"), selected?.profileKey)
-        assertTrue(selected?.strict == true)
+        assertNull(selected)
+
+        val authorized = SystemProfileSelector.select(
+            snapshot = strict,
+            userId = 0,
+            ownedPackages = setOf("com.example.map"),
+            stringArguments = listOf("com.example.map"),
+        )
+        assertEquals(ProfileKey.legacy("com.example.map"), authorized?.profileKey)
+        assertTrue(authorized?.strict == false)
     }
 }
