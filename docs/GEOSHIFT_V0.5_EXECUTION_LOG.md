@@ -65,3 +65,12 @@
 - **之前的工作流**：`#39038527478` 只验证了较早代码快照的 JVM 测试，随后因并发策略取消；不能作为最终提交的完整验收。本轮使用 `#39038730416`。
 - **任务结论**：**G03 = DONE（代码级 CI 门槛通过）**。诊断界面反映的是从用户手动导入、且可能伪造的历史日志观察；实际 Android 17 / HyperOS 真实 Hook 命中、真实值泄露和非目标应用隔离测试仍 **NOT RUN**，归 G08/G09。
 - **下一任务**：G04 定位 API 调用语义与回调正确性；重点禁止无权限或 null 返回路径被错误合成“成功定位”，验证取消、回调、缓存、注册与移除监听器，并按 SDK 适配异步 Geocoder。
+
+## 2026-10-17 · Round 004 — G04 定位 API 语义与监听器生命周期（CI 待验证）
+- **状态**：G04 = IMPLEMENTED_UNVERIFIED，必须以本轮新提交为准取得实际 GitHub Actions 测试日志。此前 G03 CI 不构成本轮证明。
+- **源码变更**：`GeoShiftModule.kt` 的 `getLastKnownLocation`、`getCurrentLocation`、Google `LocationResult` 不再凭空把 null/empty 结果转换成模拟坐标；只有真实返回的非空 `Location` 被复制修改；`CancellationSignal` 与 Executor 原样传入。位置监听器使用 `LocationListenerRegistry` 按引用身份复用，注销成功再释放，失败可重试，一次性成功回调后移除。系统回调 `SystemLocationRewriter` 不再复制空/无 Location 列表。
+- **异步 Geocoder**：API >= 33 时适配 `getFromLocation(double,double,int,GeocodeListener)`；原异步请求照常执行，透传 `onError` 和空地址列表，仅为与现配置相符的有效非空成功结果执行回调结果替换；配置变更时回退原响应。原同步 Geocoder 行为保持不变。
+- **新增纯 JVM 测试**：`LocationCallbackPolicyTest.kt`（null/empty/nonempty/Geocoder error/no backend 保真）和 `LocationListenerRegistryTest.kt`（引用身份、重用、移除失败后的保留语义、清理旧包装）。
+- **文档与门槛**：`docs/G04_LOCATION_CALLBACK_SEMANTICS.md`，含 G08/G09 受控 Android 17 / HyperOS 实机矩阵。CI = JVM tests + benchmark compile + debug APK build/upload。真机验证 **NOT RUN**。
+- **边界**：系统原生权限结果、真实取消行为、混合相同监听器并发单次/连续注册、SDK 不同 ROM 的回调实际交付未运行；不承诺“绝不泄露”，不修改 VPN/代理加密、账号风控或严格模式默认状态。
+- **下一步**：触发并完成 G04 最终 CI，若失败修复；成功后 G04 标记为 DONE（代码级）且记录 run ID/提交与产物。之后进入 G05 Profile 地域一致性、无线数据过期管理。
