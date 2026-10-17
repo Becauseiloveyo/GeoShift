@@ -6,22 +6,28 @@ import android.util.Log
 import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.ProfileStoreV2
 import io.geoshift.app.core.StrictSessionControl
+import io.geoshift.app.core.StrictSessionPolicy
 import io.github.libxposed.api.XposedModule
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Read-only process-side view of the current Strict Map Session.
+ * Defensive read-only process-side session policy. Broker hooks are disabled by G02.
  *
- * Unlike system_server, broker processes may start after the command was issued. A wall-clock
- * command stamp is therefore checked against the current boot start time. Commands from older
- * boots are ignored, preserving the runtime-only strict-session contract.
+ * Retained for compatibility tests and later owned-device research. Every access rechecks
+ * a monotonic lease instead of trusting an old preference-change notification.
  */
 internal class StrictProcessSession(
     private val module: XposedModule,
     private val prefs: SharedPreferences,
     private val processPackage: String,
 ) {
-    private val current = AtomicReference<GeoProfile?>(null)
+    private data class Active(
+        val profile: GeoProfile,
+        val issuedElapsedMs: Long,
+        val durationMs: Long,
+    )
+
+    private val current = AtomicReference<Active?>(null)
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { changedPrefs, _ ->
         refresh(changedPrefs)
     }
@@ -31,43 +37,45 @@ internal class StrictProcessSession(
         prefs.registerOnSharedPreferenceChangeListener(listener)
     }
 
-    fun profile(): GeoProfile? = current.get()
+    fun profile(): GeoProfile? {
+        val active = current.get() ?: return null
+        return if (StrictSessionPolicy.isActive(
+                SystemClock.elapsedRealtime(), active.issuedElapsedMs, active.durationMs,
+            )) active.profile else null
+    }
 
     private fun refresh(source: SharedPreferences) {
-        val now = System.currentTimeMillis()
-        val bootStart = now - SystemClock.elapsedRealtime()
-        val commandWall = source.getLong(StrictSessionControl.KEY_COMMAND_WALL_MS, 0L)
-        val commandBelongsToCurrentBoot =
-            commandWall >= bootStart - BOOT_CLOCK_TOLERANCE_MS && commandWall <= now + FUTURE_CLOCK_TOLERANCE_MS
+        val nowWall = System.currentTimeMillis()
+        val nowElapsed = SystemClock.elapsedRealtime()
+        val issuedWall = source.getLong(StrictSessionControl.KEY_COMMAND_WALL_MS, 0L)
+        val issuedElapsed = source.getLong(StrictSessionControl.KEY_ISSUED_ELAPSED_MS, 0L)
+        val duration = source.getLong(StrictSessionControl.KEY_DURATION_MS, 0L)
+        val enabled = source.getBoolean(StrictSessionControl.KEY_ENABLED, false)
+        val acknowledged = source.getBoolean(StrictSessionControl.KEY_ACKNOWLEDGE_GLOBAL, false)
 
         val candidate = if (
-            commandBelongsToCurrentBoot &&
-            source.getBoolean(StrictSessionControl.KEY_ENABLED, false)
+            enabled && acknowledged &&
+            StrictSessionPolicy.isCurrentBootCommand(
+                nowWall, nowElapsed, issuedWall, issuedElapsed, duration,
+            )
         ) {
             val packageName = source.getString(StrictSessionControl.KEY_PACKAGE, "").orEmpty().trim()
             ProfileStoreV2.load(source, packageName)
                 ?.takeIf { it.enabled && it.locationEnabled }
-        } else {
-            null
-        }
+                ?.let { Active(it, issuedElapsed, duration) }
+        } else null
 
-        val previous = current.getAndSet(candidate)
-        if (previous?.targetPackage != candidate?.targetPackage) {
-            if (candidate == null) {
-                module.log(Log.INFO, TAG, "Strict broker session inactive in $processPackage")
-            } else {
-                module.log(
-                    Log.INFO,
-                    TAG,
-                    "Strict broker session active in $processPackage for ${candidate.targetPackage} at ${candidate.latitude},${candidate.longitude}",
-                )
-            }
+        val before = current.getAndSet(candidate)
+        if ((before == null) != (candidate == null)) {
+            module.log(
+                Log.INFO,
+                TAG,
+                "Strict broker session ${if (candidate == null) "inactive" else "leased"} in $processPackage",
+            )
         }
     }
 
     companion object {
         private const val TAG = "GeoShiftStrict"
-        private const val BOOT_CLOCK_TOLERANCE_MS = 10_000L
-        private const val FUTURE_CLOCK_TOLERANCE_MS = 60_000L
     }
 }
