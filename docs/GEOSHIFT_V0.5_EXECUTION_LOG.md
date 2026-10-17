@@ -74,3 +74,9 @@
 - **文档与门槛**：`docs/G04_LOCATION_CALLBACK_SEMANTICS.md`，含 G08/G09 受控 Android 17 / HyperOS 实机矩阵。CI = JVM tests + benchmark compile + debug APK build/upload。真机验证 **NOT RUN**。
 - **边界**：系统原生权限结果、真实取消行为、混合相同监听器并发单次/连续注册、SDK 不同 ROM 的回调实际交付未运行；不承诺“绝不泄露”，不修改 VPN/代理加密、账号风控或严格模式默认状态。
 - **下一步**：触发并完成 G04 最终 CI，若失败修复；成功后 G04 标记为 DONE（代码级）且记录 run ID/提交与产物。之后进入 G05 Profile 地域一致性、无线数据过期管理。
+
+### Round 004 CI 失败与明确修复（不得删除失败证据）
+- **失败流水线**：[GitHub Actions #39050444176](https://github.com/Becauseiloveyo/GeoShift/actions/runs/39050444176)，提交 `101fc8ce9c1bf089f80dc12f811985bfbb1c6902`，job `117447759935`，`failure`。
+- **唯一编译错误**：`app/src/test/java/io/geoshift/app/core/LocationCallbackPolicyTest.kt:13`，Kotlin 泛型 `LocationCallbackPolicy.transform(null)` 推断为 `Nothing`，导致 `expected Nothing, actual String`；不是运行时定位 API 失败。
+- **修复**：对 null 回调测试显式使用 `LocationCallbackPolicy.transform<String>(null)`；修复提交 `a27236599ac09c8fc95d1800b4d6a314e44136e5`。不改其他断言、不删除测试。
+- **后续检查**：重新触发完整 CI；未成功之前任务状态继续 `IMPLEMENTED_UNVERIFIED`。
