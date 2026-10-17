@@ -1,6 +1,7 @@
 package io.geoshift.app.hooks
 
 import android.location.Location
+import android.os.SystemClock
 import android.util.Log
 import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.SystemRuntimeSnapshot
@@ -61,7 +62,7 @@ internal class StrictProviderDeliveryHooks(
             .forEach { method ->
                 runCatching {
                     module.hook(method).intercept { chain ->
-                        val profile = snapshot().strictProfile()
+                        val profile = snapshot().strictProfile(SystemClock.elapsedRealtime())
                             ?: return@intercept chain.proceed()
 
                         val forwarded = chain.args.toTypedArray()
