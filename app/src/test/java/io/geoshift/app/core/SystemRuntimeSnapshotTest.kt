@@ -25,10 +25,13 @@ class SystemRuntimeSnapshotTest {
 
         val armed = snapshot.armStrictSession(ProfileKey.legacy("com.example.map"), 1234L)
         assertEquals(ProfileKey.legacy("com.example.map"), armed.strictSession?.profileKey)
-        assertSame(enabled, armed.strictProfile())
+        assertSame(enabled, armed.strictProfile(1234L))
+        assertNull(armed.strictProfile(1234L + StrictSessionPolicy.DEFAULT_DURATION_MS))
 
         val refused = snapshot.armStrictSession(ProfileKey.legacy("com.example.disabled"), 1234L)
         assertNull(refused.strictSession)
         assertTrue(armed.clearStrictSession().strictSession == null)
+        assertNull(armed.clearStrictSession().strictProfile(1234L))
+        assertNull(armed.strictProfile(1233L))
     }
 }
