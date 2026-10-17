@@ -80,3 +80,12 @@
 - **唯一编译错误**：`app/src/test/java/io/geoshift/app/core/LocationCallbackPolicyTest.kt:13`，Kotlin 泛型 `LocationCallbackPolicy.transform(null)` 推断为 `Nothing`，导致 `expected Nothing, actual String`；不是运行时定位 API 失败。
 - **修复**：对 null 回调测试显式使用 `LocationCallbackPolicy.transform<String>(null)`；修复提交 `a27236599ac09c8fc95d1800b4d6a314e44136e5`。不改其他断言、不删除测试。
 - **后续检查**：重新触发完整 CI；未成功之前任务状态继续 `IMPLEMENTED_UNVERIFIED`。
+
+### Round 004 G04 最终验收 / CI PASS
+- **最终受测提交**：`e236cc1d733bc83967653dbc46d510bc8d34d504`（包含上一轮 CI 失败证据、泛型测试修复以及全部 G04 代码）。
+- **GitHub Actions**：[运行 #39050614646](https://github.com/Becauseiloveyo/GeoShift/actions/runs/39050614646)，job `117448260390`，`completed / success`。
+- **真实执行通过**：`gradle :app:testDebugUnitTest --stacktrace` → BUILD SUCCESSFUL 1m27s；`gradle :app:assembleBenchmark :benchmark:assembleBenchmark --stacktrace` → BUILD SUCCESSFUL 1m11s（**仅编译，不是实测性能**）；`gradle :app:assembleDebug --stacktrace` → BUILD SUCCESSFUL 19s；Upload debug APK → success。
+- **Artifact**：`GeoShift-debug-e236cc1d733bc83967653dbc46d510bc8d34d504`，ID `12107328331`；GitHub artifact archive `10,616,040 bytes`。不等于 APK 内部文件大小、签名核验或实机功能验证。
+- **验证结论**：G04 = **DONE（代码级及 CI 门槛）**。新建纯 JVM 单测已纳入 Gradle 实际执行，未从 Gradle 日志单独确认具体通过用例总数；不能臆造计数。
+- **限制和遗留设备验证**：Android 17/HyperOS 上的动态 API Hook、Geocoder callback 顺序/线程、取消/超时、系统异常回退、混合模式相同 Listener 的重复注册、非目标应用隔离仍 **NOT RUN**，归 G08/G09。同步 Geocoder 的既有模拟地址行为未改变。不承诺 100% 无泄漏或对任何平台账号限制有效。
+- **下一任务**：G05 原子 Profile 地域快照、Follow-VPN 地理数据更新及 Wi-Fi/基站的过期状态与重载不变式；必须先读本计划/日志/当前源码，补回归测试和 CI。
