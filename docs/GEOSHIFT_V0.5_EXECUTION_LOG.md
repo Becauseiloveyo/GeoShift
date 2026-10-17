@@ -51,3 +51,8 @@
 - **文档**：`docs/G03_HOOK_DIAGNOSTICS.md` 说明状态语义、日志导入限制、测试矩阵和可信度边界。
 - **未完成**：本轮代码的 GitHub Actions 完整结果仍需核实；设备上真实 API 的实际交付结果 **NOT RUN**，由 G08/G09 验证。
 - **下一步**：触发并审阅 Android CI；有编译/单测失败则修复并重跑；成功后更新 G03=DONE（代码级），再推进 G04。
+
+### Round 003 增补 / 最终源码 CI 范围
+- 在首轮 CI 排队后补充：`GeoShiftModule` 对时区、Locale、Geocoder、Wi-Fi、Telephony、CellIdentity 的安装/失败与部分命中/改写事件；Diagnostics 页面区分 `io.geoshift.system` 的系统全局安装证据与归因到 Profile 的事件；日志解析兼容 CRLF。
+- `HookAuditTest` 新增 CRLF 回归。所有观测状态仍表示历史、可伪造的日志证据，非实际隐私安全通过率；没有独立 Probe 的真实设备验证。
+- 旧的首轮 CI `39038527478` 仅覆盖较早快照，不可替代本次最终代码验证。记录下一次无 `[skip ci]` 提交对应的完整流水线作为**G03 最终验收**。
