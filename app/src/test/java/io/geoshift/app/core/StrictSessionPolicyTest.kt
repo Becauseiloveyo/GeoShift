@@ -6,6 +6,15 @@ import org.junit.Test
 
 class StrictSessionPolicyTest {
     @Test
+    fun explicitGlobalAcknowledgementIsRequired() {
+        assertFalse(StrictSessionPolicy.canArm(false, 120_000))
+        assertFalse(StrictSessionPolicy.canArm(true, 120_001))
+        assertFalse(StrictSessionPolicy.canArm(true, 0))
+        assertTrue(StrictSessionPolicy.canArm(true, 1))
+        assertTrue(StrictSessionPolicy.canArm(true, 120_000))
+    }
+
+    @Test
     fun exactTimeoutBoundaryIsInactive() {
         assertTrue(StrictSessionPolicy.isActive(10_001, 10_000, 2_000))
         assertTrue(StrictSessionPolicy.isActive(11_999, 10_000, 2_000))
