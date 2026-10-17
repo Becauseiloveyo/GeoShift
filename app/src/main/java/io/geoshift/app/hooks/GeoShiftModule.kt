@@ -244,7 +244,7 @@ class GeoShiftModule : XposedModule() {
         // mapping on first location delivery, including when client code throws.
         var wrapper: LocationListener? = null
         val created = Proxy.newProxyInstance(
-            LocationListener::class.java.classLoader,
+            original.javaClass.classLoader ?: LocationListener::class.java.classLoader,
             arrayOf(LocationListener::class.java),
         ) { _, method, args ->
             val forwarded = args?.map { value ->
@@ -311,9 +311,10 @@ class GeoShiftModule : XposedModule() {
         return when (value) {
             null -> null
             is Location -> locationForProfile(value, current)
-            is List<*> -> LocationCallbackPolicy.transformList(value) { item ->
-                if (item is Location) locationForProfile(item, current) else item
-            }
+            is List<*> -> if (value.none { it is Location }) value
+                else LocationCallbackPolicy.transformList(value) { item ->
+                    if (item is Location) locationForProfile(item, current) else item
+                }
             else -> value
         }
     }
