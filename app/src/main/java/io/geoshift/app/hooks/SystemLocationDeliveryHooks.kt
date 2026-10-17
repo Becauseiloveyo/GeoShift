@@ -126,8 +126,7 @@ internal class SystemLocationDeliveryHooks(
 
     private fun resolveTarget(args: Array<Any?>): SystemDeliveryTarget? {
         val current = snapshot()
-        current.strictSession?.let { return SystemDeliveryTarget(it.profileKey, strict = true) }
-
+        // Global strict sessions cannot bypass caller identity for direct framework calls.
         val uid = callerUid() ?: return null
         val packages = runCatching { context.packageManager.getPackagesForUid(uid)?.toSet().orEmpty() }
             .getOrElse { return null }
