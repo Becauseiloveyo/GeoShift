@@ -6,6 +6,7 @@ import android.os.Binder
 import android.os.Build
 import android.util.Log
 import io.geoshift.app.core.GeoProfile
+import io.geoshift.app.core.AuditOutcome
 import io.geoshift.app.core.SystemRuntimeSnapshot
 import io.github.libxposed.api.XposedModule
 import java.lang.reflect.InvocationTargetException
@@ -25,6 +26,7 @@ internal class SystemLocationDeliveryHooks(
     private val context: Context,
     private val snapshot: () -> SystemRuntimeSnapshot,
 ) {
+    private val audit = HookAuditEmitter(module, "io.geoshift.system")
     data class InstallReport(
         val lastLocationHooks: Int,
         val currentLocationHooks: Int,
@@ -37,6 +39,8 @@ internal class SystemLocationDeliveryHooks(
         val serviceClass = runCatching {
             Class.forName("com.android.server.location.LocationManagerService", false, classLoader)
         }.getOrElse {
+            audit.emit("system_last", AuditOutcome.NOT_COVERED)
+            audit.emit("system_callback", AuditOutcome.NOT_COVERED)
             module.log(Log.WARN, TAG, "LocationManagerService unavailable; direct delivery layer skipped", it)
             return InstallReport(0, 0, 0)
         }
@@ -44,6 +48,8 @@ internal class SystemLocationDeliveryHooks(
         val last = hookLastLocation(serviceClass)
         val current = hookCallbackMethod(serviceClass, "getCurrentLocation", "ILocationCallback")
         val listeners = hookCallbackMethod(serviceClass, "registerLocationListener", "ILocationListener")
+        audit.emit("system_last", if (last > 0) AuditOutcome.INSTALLED else AuditOutcome.NOT_COVERED)
+        audit.emit("system_callback", if (current + listeners > 0) AuditOutcome.INSTALLED else AuditOutcome.NOT_COVERED)
         return InstallReport(last, current, listeners)
     }
 
@@ -56,11 +62,19 @@ internal class SystemLocationDeliveryHooks(
                     module.hook(method).intercept { chain ->
                         val target = resolveTarget(chain.args.toTypedArray())
                             ?: return@intercept chain.proceed()
+                        audit.emit("system_last", AuditOutcome.HIT, true, target.profileKey.packageName)
                         val original = chain.proceed() as? Location
-                        SystemLocationRewriter.rewrite(original, profileFor(target))
+                        val rewritten = SystemLocationRewriter.rewrite(original, profileFor(target))
+                        if (rewritten !== original) {
+                            audit.emit("system_last", AuditOutcome.REWRITTEN, true, target.profileKey.packageName)
+                        }
+                        rewritten
                     }
                     installed++
-                }.onFailure { module.log(Log.WARN, TAG, "Failed to hook ${method.signature()}", it) }
+                }.onFailure {
+                    audit.emit("system_last", AuditOutcome.FAILED)
+                    module.log(Log.WARN, TAG, "Failed to hook ${method.signature()}", it)
+                }
             }
         return installed
     }
@@ -83,6 +97,7 @@ internal class SystemLocationDeliveryHooks(
                     module.hook(method).intercept { chain ->
                         val target = resolveTarget(chain.args.toTypedArray())
                             ?: return@intercept chain.proceed()
+                        audit.emit("system_callback", AuditOutcome.HIT, true, target.profileKey.packageName)
                         val original = chain.args.getOrNull(callbackIndex)
                             ?: return@intercept chain.proceed()
                         val callbackType = method.parameterTypes[callbackIndex]
@@ -93,7 +108,10 @@ internal class SystemLocationDeliveryHooks(
                         chain.proceed(forwarded)
                     }
                     installed++
-                }.onFailure { module.log(Log.WARN, TAG, "Failed to hook ${method.signature()}", it) }
+                }.onFailure {
+                    audit.emit("system_callback", AuditOutcome.FAILED)
+                    module.log(Log.WARN, TAG, "Failed to hook ${method.signature()}", it)
+                }
             }
         return installed
     }
@@ -106,7 +124,11 @@ internal class SystemLocationDeliveryHooks(
         Proxy.newProxyInstance(callbackType.classLoader, arrayOf(callbackType)) { _, method, args ->
             val profile = profileFor(target)
             val forwarded = args?.map { value ->
-                SystemLocationRewriter.rewriteCallbackValue(value, profile)
+                val rewritten = SystemLocationRewriter.rewriteCallbackValue(value, profile)
+                if (rewritten !== value) {
+                    audit.emit("system_callback", AuditOutcome.REWRITTEN, true, target.profileKey.packageName)
+                }
+                rewritten
             }?.toTypedArray() ?: emptyArray()
             try {
                 method.invoke(original, *forwarded)
@@ -115,6 +137,7 @@ internal class SystemLocationDeliveryHooks(
             }
         }
     }.onFailure {
+        audit.emit("system_callback", AuditOutcome.FAILED)
         module.log(Log.WARN, TAG, "Unable to wrap ${callbackType.name}; using original callback", it)
     }.getOrNull()
 
