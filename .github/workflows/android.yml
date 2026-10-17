@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feat/v0.5-privacy-reliability ]
   pull_request:
 
 concurrency:
