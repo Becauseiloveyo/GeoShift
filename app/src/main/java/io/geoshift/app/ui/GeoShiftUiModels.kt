@@ -1,9 +1,10 @@
 package io.geoshift.app.ui
 
 import io.geoshift.app.core.GeoProfile
+import io.geoshift.app.core.HookAuditEvent
 import io.geoshift.app.core.ProviderSettings
 
-enum class Destination { Overview, Profiles, Providers }
+enum class Destination { Overview, Profiles, Providers, Diagnostics }
 
 data class AppChoice(val label: String, val packageName: String)
 
@@ -17,6 +18,8 @@ data class GeoShiftUiState(
     val syncStatus: String = "No synchronization yet",
     val radioStatus: String = "Radio providers not configured",
     val notice: String? = null,
+    val auditEvents: List<HookAuditEvent> = emptyList(),
+    val auditLogStatus: String = "No diagnostic evidence imported",
     val isSyncing: Boolean = false,
     val isRadioBusy: Boolean = false,
     val editingProfile: GeoProfile? = null,
@@ -36,6 +39,7 @@ data class GeoShiftActions(
     val requestScope: (String) -> Unit,
     val exportProfile: (GeoProfile) -> Unit,
     val importProfile: () -> Unit,
+    val importAudit: () -> Unit,
     val saveProviders: (ProviderSettings.Snapshot) -> Unit,
     val previewRadio: () -> Unit,
     val applyRadioSuggestion: () -> Unit,
