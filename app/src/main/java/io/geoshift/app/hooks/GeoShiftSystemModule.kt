@@ -1,10 +1,12 @@
 package io.geoshift.app.hooks
 
 import android.content.SharedPreferences
+import android.os.SystemClock
 import android.util.Log
 import io.geoshift.app.core.ProfileKey
 import io.geoshift.app.core.ProfileStoreV2
 import io.geoshift.app.core.StrictSessionControl
+import io.geoshift.app.core.StrictSessionPolicy
 import io.geoshift.app.core.SystemRuntimeSnapshot
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
@@ -92,9 +94,16 @@ class GeoShiftSystemModule : XposedModule() {
         if (commandId == lastStrictCommandId) return
         lastStrictCommandId = commandId
 
-        if (!prefs.getBoolean(StrictSessionControl.KEY_ENABLED, false)) {
+        // Explicit opt-in to a shared, system-wide experiment; no implicit per-app guarantee.
+        val enabled = prefs.getBoolean(StrictSessionControl.KEY_ENABLED, false)
+        val acknowledged = prefs.getBoolean(StrictSessionControl.KEY_ACKNOWLEDGE_GLOBAL, false)
+        val issuedElapsed = prefs.getLong(StrictSessionControl.KEY_ISSUED_ELAPSED_MS, 0L)
+        val duration = prefs.getLong(StrictSessionControl.KEY_DURATION_MS, 0L)
+        if (!enabled || !acknowledged ||
+            !StrictSessionPolicy.isActive(SystemClock.elapsedRealtime(), issuedElapsed, duration)
+        ) {
             runtime.updateAndGet { it.clearStrictSession() }
-            log(Log.INFO, STRICT_TAG, "Strict map session stopped")
+            log(Log.INFO, STRICT_TAG, "Strict session stopped or rejected (inactive, unacknowledged or expired)")
             return
         }
 
@@ -102,19 +111,19 @@ class GeoShiftSystemModule : XposedModule() {
         val userId = prefs.getInt(StrictSessionControl.KEY_USER_ID, ProfileKey.SYSTEM_USER_ID)
         val key = runCatching { ProfileKey(userId, packageName) }.getOrNull()
         if (key == null) {
+            runtime.updateAndGet { it.clearStrictSession() }
             log(Log.WARN, STRICT_TAG, "Strict map session rejected: invalid profile key")
             return
         }
 
         val updated = runtime.updateAndGet { snapshot ->
-            snapshot.armStrictSession(key, System.currentTimeMillis())
+            snapshot.clearStrictSession().armStrictSession(key, issuedElapsed, duration)
         }
         if (updated.strictSession?.profileKey == key) {
-            val profile = updated.profiles[key]
             log(
-                Log.INFO,
+                Log.WARN,
                 STRICT_TAG,
-                "Strict map session armed for user=$userId package=$packageName at ${profile?.latitude},${profile?.longitude}",
+                "EXPERIMENTAL GLOBAL strict session armed; affects shared provider consumers, user=$userId package=$packageName ttlMs=$duration",
             )
         } else {
             log(Log.WARN, STRICT_TAG, "Strict map session rejected: profile missing, disabled, or location disabled")
@@ -125,7 +134,12 @@ class GeoShiftSystemModule : XposedModule() {
         runCatching {
             val previous = runtime.get()
             val loaded = SystemProfileSnapshotLoader.load(prefs)
-            val retainedSession = previous.strictSession?.takeIf { loaded.profiles.containsKey(it.profileKey) }
+            val retainedSession = previous.strictSession?.takeIf { session ->
+                loaded.profiles[session.profileKey]?.let { it.enabled && it.locationEnabled } == true &&
+                    prefs.getBoolean(StrictSessionControl.KEY_ENABLED, false) &&
+                    prefs.getBoolean(StrictSessionControl.KEY_ACKNOWLEDGE_GLOBAL, false) &&
+                    session.isActive(SystemClock.elapsedRealtime())
+            }
             runtime.set(loaded.copy(strictSession = retainedSession))
         }.onFailure {
             // Fail open: keep the last known-good immutable snapshot.
