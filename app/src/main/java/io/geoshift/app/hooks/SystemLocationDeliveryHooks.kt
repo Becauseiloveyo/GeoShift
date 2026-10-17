@@ -119,9 +119,7 @@ internal class SystemLocationDeliveryHooks(
     }.getOrNull()
 
     private fun profileFor(target: SystemDeliveryTarget): GeoProfile? {
-        val current = snapshot()
-        if (target.strict && current.strictSession?.profileKey != target.profileKey) return null
-        return current.profiles[target.profileKey]
+        return snapshot().profiles[target.profileKey]
     }
 
     private fun resolveTarget(args: Array<Any?>): SystemDeliveryTarget? {
