@@ -16,8 +16,7 @@ internal object SystemProfileSelector {
         ownedPackages: Set<String>,
         stringArguments: Iterable<String>,
     ): SystemDeliveryTarget? {
-        snapshot.strictSession?.let { return SystemDeliveryTarget(it.profileKey, strict = true) }
-
+        // Strict provider sessions never override Binder/UID-based per-app identity.
         return stringArguments.asSequence()
             .map(String::trim)
             .filter(String::isNotBlank)
