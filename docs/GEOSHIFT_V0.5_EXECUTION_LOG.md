@@ -21,3 +21,13 @@
 - **本地限制**：当前 ChatGPT 容器具备 Java 21，但无 Gradle、Android SDK，且无法解析 github.com；未在本机重复运行构建、未实机安装、未完成 Hook 端到端测试：**NOT RUN**。
 - **源码分支说明**：与上一开发基线相比，此轮只增加文档和 CI 分支触发；运行时代码没有变化。
 - **下一任务**：G02 Strict Map Session 超时、隔离和停止语义；先加纯逻辑测试，再修改系统 Hook，必须有 CI 证据后才能标记 DONE。
+
+## 2026-10-17 · Round 002 — G02 Strict Map Session 代码修复（提交待验证）
+- **当前状态**：G02 = IMPLEMENTED_UNVERIFIED；等待新的 GitHub Actions 完整构建，不能提前写 DONE。
+- **已提交源码**：`StrictSessionPolicy.kt`（有上界的单调时钟 TTL / 显式确认）；`StrictSessionControl.kt` 和 `StrictSessionCommandReceiver.kt`（root/shell-only 命令新增 `acknowledge_global_impact` 与 `duration_ms`，默认不启用）；`SystemRuntimeSnapshot.kt`（每次读会话检查 TTL）；`GeoShiftSystemModule.kt`、`StrictProviderDeliveryHooks.kt`（系统 provider 显式门控）；`SystemLocationDeliveryHooks.kt` 与 `SystemProfileSelector.kt`（移除 Strict 对 UID/包名选择的绕过）；`GeoShiftStrictPackageModule.kt`（暂时完全禁止共享 Broker/高德 callback-blackhole Hook）；`StrictProcessSession.kt`（休眠代码防御式 TTL 门控）。
+- **测试代码**：新增 `StrictSessionPolicyTest.kt`（显式确认、限时、边界、重启/时钟偏移）；修改 `SystemRuntimeSnapshotTest.kt` 和 `SystemProfileSelectorTest.kt`（过期、失效、无身份调用不能命中）。
+- **文档**：`docs/STRICT_SESSION_SAFETY.md` + README 显式的受控设备使用方式和风险提示。
+- **安全差异**：未经设备验证的共享 Broker 位置 Hook 不再安装。系统共享 Provider Hook 仍存在，但**只有开发者显式确认系统级影响且 TTL 有效**才会修改数据；正常模式保持原有包身份限定。
+- **阶段性验证**：静态复核修改过的源码与测试逻辑；当前提交后的 GitHub CI 结果尚未确认，真机复测 **NOT RUN**。
+- **现有限制**：CLI stop 经 Remote Preferences 通知而非同步全链路屏障；缺应用内紧急停止 UI；实时地图和非目标应用对照由 G08/G09 实际验证。不得描述为“完全无泄漏”。
+- **下一步**：等效于原 CI 的新分支流水线必须通过 JVM tests、Macrobenchmark 编译、Debug APK build/upload，记录 run id/提交 SHA。若失败先修复，成功后 G02 可标 DONE（代码级），实机证据仍归 G09。
