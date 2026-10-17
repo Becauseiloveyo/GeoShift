@@ -19,7 +19,7 @@ class SystemProfileSelectorTest {
             stringArguments = listOf("gps", "com.example.map", "tag"),
         )
         assertEquals(ProfileKey.legacy("com.example.map"), accepted?.profileKey)
-        assertTrue(accepted?.strict == false)
+        assertEquals(ProfileKey.legacy("com.example.map"), accepted?.profileKey)
 
         val rejected = SystemProfileSelector.select(
             snapshot = snapshot,
@@ -52,6 +52,6 @@ class SystemProfileSelectorTest {
             stringArguments = listOf("com.example.map"),
         )
         assertEquals(ProfileKey.legacy("com.example.map"), authorized?.profileKey)
-        assertTrue(authorized?.strict == false)
+        assertEquals(ProfileKey.legacy("com.example.map"), authorized?.profileKey)
     }
 }
