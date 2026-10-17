@@ -2,7 +2,7 @@
 
 > **唯一执行依据 / Single Source of Truth**
 >
-> 状态：**IN PROGRESS — G00/G01 COMPLETE; G02 NEXT**  
+> 状态：**IN PROGRESS — G02 IMPLEMENTED_UNVERIFIED; CI PENDING**  
 > 计划版本：1.0.0；建立日期：2026-10-17  
 > 仓库：`Becauseiloveyo/GeoShift`；开发分支：`feat/v0.5-privacy-reliability`  
 > 基线分支：`feat/v0.1-foundation`；基线提交：`31b14b46923c9f710936b4298e00231781c263f7`（2026-09-07）  
@@ -47,7 +47,7 @@
 |---|---|---|---|---|
 | G00 | P0 | 固化计划、Git 开发分支、基线、执行规则 | 计划和执行日志可从分支读到，未篡改原开发分支 | DONE |
 | G01 | P0 | 可重复构建和测试基线 | GitHub Actions #39010985422：JVM tests/benchmark 编译/debug APK/upload 全部成功；设备运行未验收 | DONE |
-| G02 | P0 | Strict Map Session 安全止损 | 禁用默认共享 provider 修改；提供超时/立即停用/开机不恢复；模拟时钟单测；标明非目标应用影响范围 | TODO |
+| G02 | P0 | Strict Map Session 安全止损 | 已提交 opt-in + 120s TTL + Shell stop + 身份隔离 + 禁用 Broker 全局适配；等待本分支完整 CI 验证，真机测试归 G09 | IMPLEMENTED_UNVERIFIED |
 | G03 | P0 | Hook 可观测性与身份隔离 | 显示“已安装/已命中/未验证/失败”；UID/包名归因单测；无身份的调用不能宣传为隔离成功 | TODO |
 | G04 | P0 | 定位 API 语义和回调稳定性 | 覆盖 null、取消、单次/连续/缓存和移除监听器；按 SDK 探测 Geocoder 异步接口；避免伪造无授权的定位成功 | TODO |
 | G05 | P1 | 原子地理 Profile、无线数据有效期 | VPN 地区变化时旧无线数据不得作为新地区“有效”；快照版本、来源、过期状态、同步失败回退有单测 | TODO |
@@ -91,7 +91,7 @@
 
 ### G09-G10 收尾
 - 以 Android 17 / HyperOS 为主要设备矩阵，AOSP 作为对照（若未获得设备则标 BLOCKED，不得宣称实机完成）。
-- 验收：目标应用定位链路 30 分钟连续无非预期回跳；3 个非目标对照应用定位输出不被改变；超时/停用/重启后没有残留 Strict 全局效果；导出不含密钥；自动化测试无失败。**这些是目标门槛，不是已测结果。**
+- 验收：目标应用定位链路 30 分钟连续无非预期回跳；**正常按应用模式**下 3 个非目标对照应用定位输出不被改变；实验 Strict 模式的共享 provider 影响范围必须明确报告且不得用于日常；超时/停用/重启后没有残留 Strict 全局效果；导出不含密钥；自动化测试无失败。**这些是目标门槛，不是已测结果。**
 - 项目尚无开源许可证，未经用户选定不得擅自添加 License 或 GPL 实现；发布必须有第三方许可清单与 SHA256。
 
 ## 4. 开源复用清单和许可闸门
