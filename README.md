@@ -2,7 +2,7 @@
 
 GeoShift is an Android 10+ / libxposed module for per-app geographic environment profiles and controlled location compatibility testing.
 
-## Current development milestone: v0.4.2-dev
+## Current development milestone: v0.5.0-alpha (G02 safety hardening)
 
 The v0.4 branch keeps the v0.3.4 per-app profile, Follow-VPN, Wi-Fi/cell provider, localization, diagnostics, and performance work while adding an Android 17 / HyperOS system-server compatibility layer.
 
@@ -39,7 +39,7 @@ The system hook hot path consumes an immutable snapshot through `AtomicReference
 
 v0.4.2 adds an explicit, runtime-only Strict Map Session for cases where a brokered fused/network provider initially accepts the profile location but a later shared provider update moves the map back to the real device location.
 
-Strict mode is intentionally **inactive by default**. While inactive, the new provider-global hooks immediately proceed with the original system values.
+Strict mode is intentionally **inactive by default** and is **NOT per-app isolation**. v0.5 G02 additionally requires explicit acknowledgement of system-wide impact, and every provider callback checks a monotonic-clock lease (maximum **120 seconds**). Normal direct framework delivery always retains UID/package identity checks even during a strict session. The private AMap / broker-global fused adapters are disabled pending owned-device isolation validation. See [G02 safety notes](docs/STRICT_SESSION_SAFETY.md).
 
 When explicitly armed for an existing enabled location profile, strict mode also rewrites provider-delivery locations in:
 
@@ -50,9 +50,12 @@ When explicitly armed for an existing enabled location profile, strict mode also
 
 `android.location.LocationResult` is copied through its `create(List<Location>)` factory where available instead of mutating the provider-owned `mLocations` list in place. Plain `Location`, `List<Location>` and `Location[]` arguments are also copied/replaced. Unsupported shapes fail open.
 
-Strict mode also sanitizes the copied Android 12+ `Location.isMock` flag. Original provider timing, accuracy and other copied metadata remain intact unless a profile-owned field is explicitly replaced.
+The opt-in strict provider rewrite also sanitizes the copied Android 12+ `Location.isMock` flag. Original provider timing, accuracy and other copied metadata remain intact unless a profile-owned field is explicitly replaced.
 
 **Strict mode is a shared system location session, not a guaranteed per-app isolation mode.** It exists specifically for broker/Fused paths where the final app identity may have been lost before the update reaches `system_server`. Stop the session after the map compatibility test.
+
+
+> **v0.5 G02 safety warning:** The explicit Strict Map Session rewrites **shared system provider data** and may affect unrelated apps or system services during the bounded test window. Only use it on a controlled test device. Its private fused/AMap broker callbacks (including callback-blackhole logic) are **not installed**. Normal per-app mode is separate and remains the default. Do not interpret a successful build as device-level isolation proof.
 
 #### Shell/root-only control during this validation milestone
 
@@ -61,7 +64,7 @@ The temporary command receiver is protected by `android.permission.DUMP`, so ord
 Start strict mode for a profile in the primary user:
 
 ```sh
-su -c 'am broadcast -n io.geoshift.app/.StrictSessionCommandReceiver --ez enable true --es package <target.package>'
+su -c 'am broadcast -n io.geoshift.app/.StrictSessionCommandReceiver --ez enable true --ez acknowledge_global_impact true --el duration_ms 120000 --es package <target.package>'
 ```
 
 Stop strict mode:
@@ -72,7 +75,7 @@ su -c 'am broadcast -n io.geoshift.app/.StrictSessionCommandReceiver --ez enable
 
 For another Android user/profile, add `--ei user <userId>` to the start command.
 
-A strict session is never automatically restored after reboot. On every `system_server` start, GeoShift treats the last persisted command id as historical and requires a new post-boot start command before provider-global rewriting can occur.
+A strict session is never automatically restored after reboot or `system_server` restart. Even after explicit activation it expires after at most 120 seconds, and can be stopped immediately with the command above. Manual stop requires shell access and is subject to preference propagation latency; no global effect is enabled by default.
 
 During strict-session validation, disable other location-modification Xposed modules first so their system-provider hooks do not contaminate results.
 
