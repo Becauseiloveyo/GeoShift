@@ -29,8 +29,8 @@ object StrictSessionControl {
         acknowledgeGlobalImpact: Boolean = false,
         durationMs: Long = StrictSessionPolicy.DEFAULT_DURATION_MS,
     ): Boolean {
-        if (enabled && (packageName.isBlank() || !acknowledgeGlobalImpact ||
-                durationMs !in 1L..StrictSessionPolicy.MAX_DURATION_MS)) return false
+        if (enabled && (packageName.isBlank() ||
+                !StrictSessionPolicy.canArm(acknowledgeGlobalImpact, durationMs))) return false
         if (userId < 0) return false
 
         val prefs = service.getRemotePreferences(ProfileStoreV2.REMOTE_PREFS)
