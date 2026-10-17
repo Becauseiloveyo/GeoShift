@@ -60,6 +60,7 @@ class GeoShiftModule : XposedModule() {
         installLocationManagerHooks(profile)
         installSdkLocationHooks(param.classLoader, profile)
         installGeocoderHooks(profile)
+        installAsyncGeocoderHook(profile)
         installWifiHooks(profile)
         installTelephonyHooks(profile)
         installCellIdentityHooks(profile)
@@ -343,7 +344,7 @@ class GeoShiftModule : XposedModule() {
                 val latitude = args.getOrNull(0) as? Double ?: return@intercept chain.proceed()
                 val longitude = args.getOrNull(1) as? Double ?: return@intercept chain.proceed()
                 val maxResults = (args.getOrNull(2) as? Int) ?: 1
-                if (maxResults <= 0 || abs(latitude - current!!.latitude) > 0.02 || abs(longitude - current.longitude) > 0.02) {
+                if (!geocoderMatches(current!!, latitude, longitude, maxResults)) {
                     return@intercept chain.proceed()
                 }
                 audit?.emit("geocoder", AuditOutcome.REWRITTEN, identityVerified = true)
@@ -356,6 +357,74 @@ class GeoShiftModule : XposedModule() {
             log(Log.WARN, TAG, "Geocoder hook failed", it)
         }
     }
+
+    /**
+     * API 33+ asynchronous reverse geocoding: pass through errors, empty successes
+     * and invalid requests. Only replace an existing non-empty successful result.
+     * The original request is dispatched unchanged, preserving callback timing.
+     */
+    private fun installAsyncGeocoderHook(profile: AtomicReference<GeoProfile?>) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        runCatching {
+            val callbackType = Geocoder.GeocodeListener::class.java
+            val method = Geocoder::class.java.getMethod(
+                "getFromLocation",
+                java.lang.Double.TYPE,
+                java.lang.Double.TYPE,
+                Integer.TYPE,
+                callbackType,
+            )
+            hook(method).intercept { chain ->
+                audit?.emit("geocoder", AuditOutcome.HIT, identityVerified = true)
+                val latitude = chain.args.getOrNull(0) as? Double ?: return@intercept chain.proceed()
+                val longitude = chain.args.getOrNull(1) as? Double ?: return@intercept chain.proceed()
+                val count = chain.args.getOrNull(2) as? Int ?: return@intercept chain.proceed()
+                val listener = chain.args.getOrNull(3) ?: return@intercept chain.proceed()
+                val requestedProfile = profile.get()
+                if (!requestedProfile.isGeocoderActive() ||
+                    !geocoderMatches(requestedProfile!!, latitude, longitude, count)
+                ) return@intercept chain.proceed()
+
+                val wrapped = runCatching {
+                    Proxy.newProxyInstance(
+                        listener.javaClass.classLoader,
+                        arrayOf(callbackType),
+                    ) { _, callbackMethod, callbackArgs ->
+                        val result = callbackArgs?.toMutableList() ?: mutableListOf()
+                        if (callbackMethod.name == "onGeocode" &&
+                            result.firstOrNull() is List<*> &&
+                            (result[0] as List<*>).isNotEmpty() &&
+                            profile.get() == requestedProfile
+                        ) {
+                            result[0] = listOf(addressFor(requestedProfile))
+                            audit?.emit("geocoder", AuditOutcome.REWRITTEN, identityVerified = true)
+                        }
+                        try {
+                            callbackMethod.invoke(listener, *result.toTypedArray())
+                        } catch (error: InvocationTargetException) {
+                            throw error.targetException
+                        }
+                    }
+                }.onFailure {
+                    audit?.emit("geocoder", AuditOutcome.FAILED)
+                    log(Log.WARN, TAG, "Unable to wrap async geocoder listener", it)
+                }.getOrNull() ?: return@intercept chain.proceed()
+
+                val forwarded = chain.args.toTypedArray()
+                forwarded[3] = wrapped
+                chain.proceed(forwarded)
+            }
+        }.onSuccess {
+            audit?.emit("geocoder", AuditOutcome.INSTALLED)
+        }.onFailure {
+            audit?.emit("geocoder", AuditOutcome.FAILED)
+            log(Log.WARN, TAG, "Async Geocoder hook unavailable", it)
+        }
+    }
+
+    private fun geocoderMatches(current: GeoProfile, latitude: Double, longitude: Double, count: Int): Boolean =
+        count > 0 && latitude.isFinite() && longitude.isFinite() &&
+            abs(latitude - current.latitude) <= 0.02 && abs(longitude - current.longitude) <= 0.02
 
     private fun installWifiHooks(profile: AtomicReference<GeoProfile?>) {
         hookStringMethod(WifiInfo::class.java, "getSSID", profile, "Wi-Fi SSID") { current ->
