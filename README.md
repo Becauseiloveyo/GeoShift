@@ -110,6 +110,18 @@ System-server work follows these constraints:
 
 GeoShift is intended for privacy, development, QA, and location/region compatibility testing on devices and apps you control. It does not target hardware-backed attestation, Play Integrity, financial-service controls, anti-cheat, licensing/payment eligibility, reward systems, or server-side fraud/risk controls.
 
+## v0.5 G03: Observability (audit only)
+
+A new **Diagnostics** screen imports an explicitly user-selected LSPosed/logcat text file and displays
+per-profile historical evidence for installed, hit, rewritten, failed, not-covered, or unverified
+Hook surfaces. Run-time events use the structured `GS_AUDIT_V1` format, write on a
+background worker, and never include coordinates, IP addresses, radio identifiers, or secrets.
+Application package names and log timestamps may nevertheless be sensitive.
+
+**No imported evidence means Not verified; matching log records do not prove privacy,
+isolation, or platform-account safety.** Android 17 / HyperOS device validation remains G08/G09.
+See [G03 Hook diagnostics](docs/G03_HOOK_DIAGNOSTICS.md).
+
 ## Build
 
 Current app toolchain:
