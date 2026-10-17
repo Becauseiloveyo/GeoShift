@@ -13,13 +13,22 @@ data class SystemRuntimeSnapshot(
     fun profileFor(userId: Int, packageName: String): GeoProfile? =
         runCatching { profiles[ProfileKey(userId, packageName)] }.getOrNull()
 
-    fun strictProfile(): GeoProfile? =
-        strictSession?.let { session -> profiles[session.profileKey] }
+    /** Never return a global profile after the monotonic lease expires. */
+    fun strictProfile(nowElapsedMs: Long): GeoProfile? =
+        strictSession?.takeIf { it.isActive(nowElapsedMs) }
+            ?.let { session -> profiles[session.profileKey] }
+            ?.takeIf { it.enabled && it.locationEnabled }
 
-    fun armStrictSession(profileKey: ProfileKey, startedAtEpochMs: Long): SystemRuntimeSnapshot {
+    fun armStrictSession(
+        profileKey: ProfileKey,
+        startedAtElapsedMs: Long,
+        durationMs: Long = StrictSessionPolicy.DEFAULT_DURATION_MS,
+    ): SystemRuntimeSnapshot {
         val profile = profiles[profileKey] ?: return this
-        if (!profile.enabled || !profile.locationEnabled) return this
-        return copy(strictSession = StrictMapSession(profileKey, startedAtEpochMs.coerceAtLeast(0L)))
+        if (!profile.enabled || !profile.locationEnabled ||
+            !StrictSessionPolicy.isActive(startedAtElapsedMs, startedAtElapsedMs, durationMs)
+        ) return this
+        return copy(strictSession = StrictMapSession(profileKey, startedAtElapsedMs, durationMs))
     }
 
     fun clearStrictSession(): SystemRuntimeSnapshot = copy(strictSession = null)
@@ -45,5 +54,9 @@ data class SystemRuntimeSnapshot(
  */
 data class StrictMapSession(
     val profileKey: ProfileKey,
-    val startedAtEpochMs: Long,
-)
+    val startedAtElapsedMs: Long,
+    val durationMs: Long,
+) {
+    fun isActive(nowElapsedMs: Long): Boolean =
+        StrictSessionPolicy.isActive(nowElapsedMs, startedAtElapsedMs, durationMs)
+}
