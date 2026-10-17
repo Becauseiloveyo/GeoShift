@@ -33,5 +33,13 @@ class SystemRuntimeSnapshotTest {
         assertTrue(armed.clearStrictSession().strictSession == null)
         assertNull(armed.clearStrictSession().strictProfile(1234L))
         assertNull(armed.strictProfile(1233L))
+        assertNull(armed.copy(
+            profiles = armed.profiles.mapValues { (_, profile) -> profile.copy(enabled = false) },
+        ).strictProfile(1234L))
+        assertNull(snapshot.armStrictSession(
+            ProfileKey.legacy("com.example.map"),
+            1234L,
+            durationMs = StrictSessionPolicy.MAX_DURATION_MS + 1,
+        ).strictSession)
     }
 }
