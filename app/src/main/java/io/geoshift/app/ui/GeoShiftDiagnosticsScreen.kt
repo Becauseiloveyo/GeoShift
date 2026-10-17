@@ -60,6 +60,29 @@ internal fun DiagnosticsScreen(
                 Button(onClick = actions.importAudit) { Text("Import Xposed / logcat text") }
             }
         }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("System process registration", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Registration is system-wide. Per-profile events require separate UID attribution.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    listOf("system_last" to "Cached location", "system_callback" to "Callbacks").forEach { (surface, name) ->
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                statusLabel(HookAudit.summary(state.auditEvents, "io.geoshift.system", surface)),
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    }
+                }
+            }
+        }
         if (state.profiles.isEmpty()) {
             item { Text("Create a test profile to correlate a Hook audit with an app.") }
         } else {
