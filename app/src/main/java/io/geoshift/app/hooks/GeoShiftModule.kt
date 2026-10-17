@@ -391,13 +391,18 @@ class GeoShiftModule : XposedModule() {
                         arrayOf(callbackType),
                     ) { _, callbackMethod, callbackArgs ->
                         val result = callbackArgs?.toMutableList() ?: mutableListOf()
-                        if (callbackMethod.name == "onGeocode" &&
-                            result.firstOrNull() is List<*> &&
-                            (result[0] as List<*>).isNotEmpty() &&
-                            profile.get() == requestedProfile
-                        ) {
-                            result[0] = listOf(addressFor(requestedProfile))
-                            audit?.emit("geocoder", AuditOutcome.REWRITTEN, identityVerified = true)
+                        if (callbackMethod.name == "onGeocode") {
+                            val addresses = result.firstOrNull() as? List<*>
+                            if (addresses != null) {
+                                val replaced = LocationCallbackPolicy.replaceNonEmptySuccess(
+                                    addresses,
+                                    shouldRewrite = profile.get() == requestedProfile,
+                                ) { listOf(addressFor(requestedProfile)) }
+                                if (replaced !== addresses) {
+                                    result[0] = replaced
+                                    audit?.emit("geocoder", AuditOutcome.REWRITTEN, identityVerified = true)
+                                }
+                            }
                         }
                         try {
                             callbackMethod.invoke(listener, *result.toTypedArray())
