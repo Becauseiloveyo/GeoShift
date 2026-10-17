@@ -14,6 +14,7 @@ import android.os.SystemClock
 import android.telephony.TelephonyManager
 import android.util.Log
 import io.geoshift.app.core.GeoProfile
+import io.geoshift.app.core.AuditOutcome
 import io.geoshift.app.core.ProfileStoreV2
 import io.geoshift.app.core.effectiveWifiAccessPoints
 import io.github.libxposed.api.XposedModule
@@ -35,6 +36,8 @@ class GeoShiftModule : XposedModule() {
         private val TIMEZONE_IDS = TimeZone.getAvailableIDs().toHashSet()
     }
 
+    private var audit: HookAuditEmitter? = null
+
     private val locationListenerWrappers = Collections.synchronizedMap(
         WeakHashMap<LocationListener, LocationListener>()
     )
@@ -51,6 +54,7 @@ class GeoShiftModule : XposedModule() {
             }
         }
 
+        audit = HookAuditEmitter(this, param.packageName)
         log(Log.INFO, TAG, "Installing reactive profile hooks for ${param.packageName}")
         installTimeZoneHooks(profile)
         installLocaleHooks(profile)
@@ -97,14 +101,29 @@ class GeoShiftModule : XposedModule() {
     private fun installLocationHooks(profile: AtomicReference<GeoProfile?>) {
         runCatching {
             hook(Location::class.java.getDeclaredMethod("getLatitude")).intercept { chain ->
+                audit?.emit("location_getter", AuditOutcome.HIT, identityVerified = true)
                 val current = profile.get()
-                if (!current.isLocationActive() || current!!.latitude !in -90.0..90.0) chain.proceed() else current.latitude
+                if (!current.isLocationActive() || current!!.latitude !in -90.0..90.0) chain.proceed()
+                else {
+                    audit?.emit("location_getter", AuditOutcome.REWRITTEN, identityVerified = true)
+                    current.latitude
+                }
             }
             hook(Location::class.java.getDeclaredMethod("getLongitude")).intercept { chain ->
+                audit?.emit("location_getter", AuditOutcome.HIT, identityVerified = true)
                 val current = profile.get()
-                if (!current.isLocationActive() || current!!.longitude !in -180.0..180.0) chain.proceed() else current.longitude
+                if (!current.isLocationActive() || current!!.longitude !in -180.0..180.0) chain.proceed()
+                else {
+                    audit?.emit("location_getter", AuditOutcome.REWRITTEN, identityVerified = true)
+                    current.longitude
+                }
             }
-        }.onFailure { log(Log.WARN, TAG, "Location getter hook failed", it) }
+        }.onSuccess {
+            audit?.emit("location_getter", AuditOutcome.INSTALLED)
+        }.onFailure {
+            audit?.emit("location_getter", AuditOutcome.FAILED)
+            log(Log.WARN, TAG, "Location getter hook failed", it)
+        }
     }
 
     private fun installLocationManagerHooks(profile: AtomicReference<GeoProfile?>) {
@@ -113,9 +132,16 @@ class GeoShiftModule : XposedModule() {
                 .filter { it.name == "getLastKnownLocation" && it.returnType == Location::class.java }
                 .forEach { method ->
                     hook(method).intercept { chain ->
+                        audit?.emit("framework_last", AuditOutcome.HIT, identityVerified = true)
                         val original = chain.proceed() as? Location
-                        locationForProfile(original, profile.get(), synthesize = true)
+                        val current = profile.get()
+                        val changed = locationForProfile(original, current, synthesize = true)
+                        if (current.isLocationActive() && changed !== original) {
+                            audit?.emit("framework_last", AuditOutcome.REWRITTEN, identityVerified = true)
+                        }
+                        changed
                     }
+                    audit?.emit("framework_last", AuditOutcome.INSTALLED)
                 }
 
             LocationManager::class.java.methods
@@ -125,6 +151,7 @@ class GeoShiftModule : XposedModule() {
                 }
                 .forEach { method ->
                     hook(method).intercept { chain ->
+                        audit?.emit("framework_callback", AuditOutcome.HIT, identityVerified = true)
                         val current = profile.get()
                         if (!current.isLocationActive()) return@intercept chain.proceed()
                         val index = method.parameterTypes.indexOfFirst { Consumer::class.java.isAssignableFrom(it) }
@@ -132,10 +159,16 @@ class GeoShiftModule : XposedModule() {
                             ?: return@intercept chain.proceed()
                         val args = chain.args.toTypedArray()
                         args[index] = Consumer<Any?> { value ->
-                            original.accept(locationCallbackValue(value, profile.get(), synthesizeEmpty = true))
+                            val currentValue = profile.get()
+                            val rewritten = locationCallbackValue(value, currentValue, synthesizeEmpty = true)
+                            if (currentValue.isLocationActive() && rewritten !== value) {
+                                audit?.emit("framework_callback", AuditOutcome.REWRITTEN, identityVerified = true)
+                            }
+                            original.accept(rewritten)
                         }
                         chain.proceed(args)
                     }
+                    audit?.emit("framework_callback", AuditOutcome.INSTALLED)
                 }
 
             LocationManager::class.java.methods
@@ -172,7 +205,11 @@ class GeoShiftModule : XposedModule() {
                         chain.proceed(args)
                     }
                 }
-        }.onFailure { log(Log.WARN, TAG, "LocationManager hook failed", it) }
+        }.onFailure {
+            audit?.emit("framework_last", AuditOutcome.FAILED)
+            audit?.emit("framework_callback", AuditOutcome.FAILED)
+            log(Log.WARN, TAG, "LocationManager hook failed", it)
+        }
     }
 
     private fun locationListenerWrapper(
