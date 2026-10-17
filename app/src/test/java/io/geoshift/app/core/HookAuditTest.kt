@@ -12,7 +12,7 @@ class HookAuditTest {
         val message = HookAudit.encode(event)!!
         assertEquals(event, HookAudit.parseLine("2026-10-17 I/GeoShiftAudit: $message"))
         assertFalse(message.contains("latitude"))
-        assertEquals(event, HookAudit.parseLine("I/GeoShiftAudit: $message\\r"))
+        assertEquals(event, HookAudit.parseLine("I/GeoShiftAudit: $message\r"))
     }
 
     @Test fun malformedAndUnrecognizedFieldsAreRejected() {
