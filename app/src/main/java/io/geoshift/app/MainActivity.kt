@@ -15,6 +15,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.geoshift.app.core.GeoProfile
+import io.geoshift.app.core.HookAudit
+import io.geoshift.app.core.HookAuditEvent
 import io.geoshift.app.core.ProfileCodec
 import io.geoshift.app.core.ProfileStoreV2
 import io.geoshift.app.core.ProviderSettings
@@ -49,6 +51,8 @@ class MainActivity : ComponentActivity() {
     private var providerSettings by mutableStateOf(ProviderSettings.Snapshot())
     private var syncStatus by mutableStateOf("")
     private var radioStatus by mutableStateOf("")
+    private var auditEvents by mutableStateOf<List<HookAuditEvent>>(emptyList())
+    private var auditLogStatus by mutableStateOf("No diagnostic evidence imported")
     private var notice by mutableStateOf<String?>(null)
     private var syncInFlight by mutableStateOf(false)
     private var radioQueryInFlight by mutableStateOf(false)
@@ -95,6 +99,40 @@ class MainActivity : ComponentActivity() {
         }.onFailure { toast(getString(R.string.import_failed, it.message.orEmpty())) }
     }
 
+    private val auditLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        Thread {
+            val imported = runCatching {
+                val input = contentResolver.openInputStream(uri) ?: error("Could not open diagnostic log")
+                val contents = input.bufferedReader().use { reader ->
+                    val builder = StringBuilder()
+                    val block = CharArray(4096)
+                    while (true) {
+                        val read = reader.read(block)
+                        if (read < 0) break
+                        if (builder.length + read > HookAudit.MAX_DOCUMENT_CHARS) {
+                            error("Diagnostic log exceeds the 1 MB import limit")
+                        }
+                        builder.append(block, 0, read)
+                    }
+                    builder.toString()
+                }
+                HookAudit.parseDocument(contents)
+            }
+            runOnUiThread {
+                imported.onSuccess {
+                    auditEvents = it
+                    auditLogStatus = "Imported ${it.size} distinct events (untrusted historical log)"
+                }.onFailure {
+                    auditEvents = emptyList()
+                    auditLogStatus = "Import failed: ${it.message.orEmpty()}"
+                }
+            }
+        }.start()
+    }
+
     private val serviceListener: (XposedService?) -> Unit = { service ->
         runOnUiThread {
             serviceConnected = service != null
@@ -131,6 +169,8 @@ class MainActivity : ComponentActivity() {
                         syncStatus = if (serviceConnected) "$serviceLabel · $syncStatus" else serviceLabel,
                         radioStatus = radioStatus,
                         notice = notice,
+                        auditEvents = auditEvents,
+                        auditLogStatus = auditLogStatus,
                         isSyncing = syncInFlight,
                         isRadioBusy = radioQueryInFlight,
                         editingProfile = editingProfile,
@@ -150,6 +190,7 @@ class MainActivity : ComponentActivity() {
                         requestScope = ::requestScope,
                         exportProfile = ::exportProfile,
                         importProfile = { importLauncher.launch(arrayOf("application/json", "text/json")) },
+                        importAudit = { auditLauncher.launch(arrayOf("text/plain", "text/*", "application/octet-stream")) },
                         saveProviders = ::saveProviderSettings,
                         previewRadio = ::previewRadioEnvironment,
                         applyRadioSuggestion = ::applyRadioSuggestion,
