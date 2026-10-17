@@ -28,9 +28,10 @@ internal class HookAuditEmitter(
         surface: String,
         outcome: AuditOutcome,
         identityVerified: Boolean = false,
+        targetPackageName: String = packageName,
     ) {
         val message = HookAudit.encode(
-            HookAuditEvent(packageName, surface, outcome, identityVerified),
+            HookAuditEvent(targetPackageName, surface, outcome, identityVerified),
         ) ?: return
         if (emitted.add(message)) {
             runCatching { worker.execute { module.log(Log.INFO, "GeoShiftAudit", message) } }
