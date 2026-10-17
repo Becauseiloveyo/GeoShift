@@ -11,6 +11,10 @@ internal object StrictSessionPolicy {
     const val DEFAULT_DURATION_MS = 120_000L
     private const val CLOCK_SKEW_TOLERANCE_MS = 10_000L
 
+    /** Explicit acknowledgement is mandatory even for a correctly bounded lease. */
+    fun canArm(acknowledgeGlobalImpact: Boolean, durationMs: Long): Boolean =
+        acknowledgeGlobalImpact && durationMs in 1L..MAX_DURATION_MS
+
     fun isActive(nowElapsedMs: Long, issuedElapsedMs: Long, durationMs: Long): Boolean =
         issuedElapsedMs > 0L &&
             durationMs in 1L..MAX_DURATION_MS &&
