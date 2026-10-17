@@ -36,7 +36,7 @@ object HookAudit {
     fun parseLine(line: String): HookAuditEvent? {
         val begin = line.indexOf(MARKER)
         if (begin < 0) return null
-        val tail = line.substring(begin)
+        val tail = line.substring(begin).trim()
         // Reject trailing arbitrary tokens rather than storing raw logs.
         val fields = tail.split(' ')
         if (fields.size != 5 || fields.first() != MARKER) return null
