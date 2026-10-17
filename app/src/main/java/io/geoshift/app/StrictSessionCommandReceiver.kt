@@ -18,7 +18,11 @@ import io.geoshift.app.core.StrictSessionControl
 class StrictSessionCommandReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
-        val enable = intent.getBooleanExtra(EXTRA_ENABLE, true)
+        val enable = intent.getBooleanExtra(EXTRA_ENABLE, false)
+        val acknowledgeGlobalImpact = intent.getBooleanExtra(EXTRA_ACKNOWLEDGE_GLOBAL, false)
+        val durationMs = intent.getLongExtra(
+            EXTRA_DURATION_MS, io.geoshift.app.core.StrictSessionPolicy.DEFAULT_DURATION_MS,
+        )
         val packageName = intent.getStringExtra(EXTRA_PACKAGE).orEmpty().trim()
         val userId = intent.getIntExtra(EXTRA_USER_ID, ProfileKey.SYSTEM_USER_ID)
 
@@ -30,6 +34,11 @@ class StrictSessionCommandReceiver : BroadcastReceiver() {
                 }
 
                 if (enable) {
+                    if (!acknowledgeGlobalImpact ||
+                        durationMs !in 1L..io.geoshift.app.core.StrictSessionPolicy.MAX_DURATION_MS) {
+                        Log.w(TAG, "Strict-session start rejected: explicit global-impact acknowledgement and valid TTL required")
+                        return@Thread
+                    }
                     val profile = ProfileStoreV2.load(service, packageName)
                     if (profile == null || !profile.enabled || !profile.locationEnabled) {
                         Log.w(TAG, "Strict-session command rejected: no enabled location profile for $packageName")
@@ -37,7 +46,11 @@ class StrictSessionCommandReceiver : BroadcastReceiver() {
                     }
                 }
 
-                if (StrictSessionControl.issue(service, enable, packageName, userId)) {
+                if (StrictSessionControl.issue(
+                    service, enable, packageName, userId,
+                    acknowledgeGlobalImpact = acknowledgeGlobalImpact,
+                    durationMs = durationMs,
+                )) {
                     Log.i(
                         TAG,
                         if (enable) "Strict-session command issued for user=$userId package=$packageName"
@@ -72,6 +85,8 @@ class StrictSessionCommandReceiver : BroadcastReceiver() {
         const val EXTRA_ENABLE = "enable"
         const val EXTRA_PACKAGE = "package"
         const val EXTRA_USER_ID = "user"
+        const val EXTRA_ACKNOWLEDGE_GLOBAL = "acknowledge_global_impact"
+        const val EXTRA_DURATION_MS = "duration_ms"
 
         private const val TAG = "GeoShiftStrict"
         private const val SERVICE_WAIT_MS = 4_000L
