@@ -8,7 +8,7 @@ import org.junit.Test
 class LocationCallbackPolicyTest {
     @Test fun missingResultNeverInvokesRewriteOrBecomesSuccess() {
         var called = false
-        val result: String? = LocationCallbackPolicy.transform(null) {
+        val result: String? = LocationCallbackPolicy.transform<String>(null) {
             called = true
             "fabricated"
         }
