@@ -2,7 +2,7 @@
 
 > **唯一执行依据 / Single Source of Truth**
 >
-> 状态：**IN PROGRESS — G02 IMPLEMENTED_UNVERIFIED; CI PENDING**  
+> 状态：**IN PROGRESS — G00/G01/G02 COMPLETE; G03 NEXT**  
 > 计划版本：1.0.0；建立日期：2026-10-17  
 > 仓库：`Becauseiloveyo/GeoShift`；开发分支：`feat/v0.5-privacy-reliability`  
 > 基线分支：`feat/v0.1-foundation`；基线提交：`31b14b46923c9f710936b4298e00231781c263f7`（2026-09-07）  
@@ -47,7 +47,7 @@
 |---|---|---|---|---|
 | G00 | P0 | 固化计划、Git 开发分支、基线、执行规则 | 计划和执行日志可从分支读到，未篡改原开发分支 | DONE |
 | G01 | P0 | 可重复构建和测试基线 | GitHub Actions #39010985422：JVM tests/benchmark 编译/debug APK/upload 全部成功；设备运行未验收 | DONE |
-| G02 | P0 | Strict Map Session 安全止损 | 已提交 opt-in + 120s TTL + Shell stop + 身份隔离 + 禁用 Broker 全局适配；等待本分支完整 CI 验证，真机测试归 G09 | IMPLEMENTED_UNVERIFIED |
+| G02 | P0 | Strict Map Session 安全止损 | 显式确认 + 120s TTL + Shell stop + UID/包名隔离 + 禁用 Broker 全局适配；完整 CI #39037167354 成功；实机测试归 G09 | DONE |
 | G03 | P0 | Hook 可观测性与身份隔离 | 显示“已安装/已命中/未验证/失败”；UID/包名归因单测；无身份的调用不能宣传为隔离成功 | TODO |
 | G04 | P0 | 定位 API 语义和回调稳定性 | 覆盖 null、取消、单次/连续/缓存和移除监听器；按 SDK 探测 Geocoder 异步接口；避免伪造无授权的定位成功 | TODO |
 | G05 | P1 | 原子地理 Profile、无线数据有效期 | VPN 地区变化时旧无线数据不得作为新地区“有效”；快照版本、来源、过期状态、同步失败回退有单测 | TODO |
@@ -120,7 +120,7 @@
 
 ## 6. 版本门禁与进度记账
 
-- **Alpha / GATE A**：G01（2026-10-17 CI PASS）、G02、G03、G04 完成，关键错误路径有自动化回归。
+- **Alpha / GATE A**：G01、G02（2026-10-17 CI PASS）、G03、G04 完成，关键错误路径有自动化回归。
 - **Beta / GATE B**：G05-G08 完成，独立 Probe 能实际复验；重要日志默认脱敏。
 - **Release Candidate / GATE C**：G09 在目标设备通过；没有已知 P0；尚未验证平台明确列为 NOT RUN。
 - **Stable / GATE D**：G10 完成，发布包哈希、许可和来源完整，使用范围限制已记录。
