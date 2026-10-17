@@ -78,7 +78,12 @@ class GeoShiftModule : XposedModule() {
                 if (!current.isTimezoneActive()) chain.proceed()
                 else runCatching { ZoneId.of(current!!.timezoneId) }.getOrElse { chain.proceed() }
             }
-        }.onFailure { log(Log.WARN, TAG, "Time zone hook failed", it) }
+        }.onSuccess {
+            audit?.emit("timezone", AuditOutcome.INSTALLED)
+        }.onFailure {
+            audit?.emit("timezone", AuditOutcome.FAILED)
+            log(Log.WARN, TAG, "Time zone hook failed", it)
+        }
     }
 
     private fun installLocaleHooks(profile: AtomicReference<GeoProfile?>) {
@@ -95,7 +100,12 @@ class GeoShiftModule : XposedModule() {
             hook(LocaleList::class.java.getDeclaredMethod("getAdjustedDefault")).intercept { chain ->
                 localeListOrOriginal(profile.get(), chain::proceed)
             }
-        }.onFailure { log(Log.WARN, TAG, "Locale hook failed", it) }
+        }.onSuccess {
+            audit?.emit("locale", AuditOutcome.INSTALLED)
+        }.onFailure {
+            audit?.emit("locale", AuditOutcome.FAILED)
+            log(Log.WARN, TAG, "Locale hook failed", it)
+        }
     }
 
     private fun installLocationHooks(profile: AtomicReference<GeoProfile?>) {
@@ -318,6 +328,7 @@ class GeoShiftModule : XposedModule() {
                 Integer.TYPE,
             )
             hook(method).intercept { chain ->
+                audit?.emit("geocoder", AuditOutcome.HIT, identityVerified = true)
                 val current = profile.get()
                 if (!current.isGeocoderActive()) return@intercept chain.proceed()
                 val args = chain.args
@@ -327,9 +338,15 @@ class GeoShiftModule : XposedModule() {
                 if (maxResults <= 0 || abs(latitude - current!!.latitude) > 0.02 || abs(longitude - current.longitude) > 0.02) {
                     return@intercept chain.proceed()
                 }
+                audit?.emit("geocoder", AuditOutcome.REWRITTEN, identityVerified = true)
                 listOf(addressFor(current))
             }
-        }.onFailure { log(Log.WARN, TAG, "Geocoder hook failed", it) }
+        }.onSuccess {
+            audit?.emit("geocoder", AuditOutcome.INSTALLED)
+        }.onFailure {
+            audit?.emit("geocoder", AuditOutcome.FAILED)
+            log(Log.WARN, TAG, "Geocoder hook failed", it)
+        }
     }
 
     private fun installWifiHooks(profile: AtomicReference<GeoProfile?>) {
@@ -362,7 +379,12 @@ class GeoShiftModule : XposedModule() {
                     }
                 }
             }
-        }.onFailure { log(Log.WARN, TAG, "Wi-Fi scan-result hook failed", it) }
+        }.onSuccess {
+            audit?.emit("wifi", AuditOutcome.INSTALLED)
+        }.onFailure {
+            audit?.emit("wifi", AuditOutcome.FAILED)
+            log(Log.WARN, TAG, "Wi-Fi scan-result hook failed", it)
+        }
     }
 
     private fun installTelephonyHooks(profile: AtomicReference<GeoProfile?>) {
@@ -424,7 +446,12 @@ class GeoShiftModule : XposedModule() {
                     if (!current.matchesCellSpec(spec.radioNames) || current!!.cellId < 0L) chain.proceed()
                     else if (spec.cellIdIsLong) current.cellId else current.cellId.toInt()
                 }
-            }.onFailure { log(Log.DEBUG, TAG, "${spec.className} hook skipped", it) }
+            }.onSuccess {
+                audit?.emit("cell_identity", AuditOutcome.INSTALLED)
+            }.onFailure {
+                audit?.emit("cell_identity", AuditOutcome.FAILED)
+                log(Log.DEBUG, TAG, "${spec.className} hook skipped", it)
+            }
         }
     }
 
@@ -437,8 +464,18 @@ class GeoShiftModule : XposedModule() {
     ) {
         runCatching {
             val method = target.getMethod(methodName)
-            hook(method).intercept { chain -> value(profile.get()) ?: chain.proceed() }
-        }.onFailure { log(Log.WARN, TAG, "$label hook failed", it) }
+            val surface = if (target == WifiInfo::class.java) "wifi" else "telephony"
+            hook(method).intercept { chain ->
+                audit?.emit(surface, AuditOutcome.HIT, identityVerified = true)
+                val chosen = value(profile.get())
+                if (chosen != null) audit?.emit(surface, AuditOutcome.REWRITTEN, identityVerified = true)
+                chosen ?: chain.proceed()
+            }
+            audit?.emit(surface, AuditOutcome.INSTALLED)
+        }.onFailure {
+            audit?.emit(if (target == WifiInfo::class.java) "wifi" else "telephony", AuditOutcome.FAILED)
+            log(Log.WARN, TAG, "$label hook failed", it)
+        }
     }
 
     private fun hookIntMethod(
@@ -450,8 +487,18 @@ class GeoShiftModule : XposedModule() {
     ) {
         runCatching {
             val method = target.getMethod(methodName)
-            hook(method).intercept { chain -> value(profile.get()) ?: chain.proceed() }
-        }.onFailure { log(Log.WARN, TAG, "$label hook failed", it) }
+            val surface = if (target == WifiInfo::class.java) "wifi" else "telephony"
+            hook(method).intercept { chain ->
+                audit?.emit(surface, AuditOutcome.HIT, identityVerified = true)
+                val chosen = value(profile.get())
+                if (chosen != null) audit?.emit(surface, AuditOutcome.REWRITTEN, identityVerified = true)
+                chosen ?: chain.proceed()
+            }
+            audit?.emit(surface, AuditOutcome.INSTALLED)
+        }.onFailure {
+            audit?.emit(if (target == WifiInfo::class.java) "wifi" else "telephony", AuditOutcome.FAILED)
+            log(Log.WARN, TAG, "$label hook failed", it)
+        }
     }
 
     private fun addressFor(profile: GeoProfile): Address {
