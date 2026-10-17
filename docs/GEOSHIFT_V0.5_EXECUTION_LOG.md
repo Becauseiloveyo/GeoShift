@@ -56,3 +56,12 @@
 - 在首轮 CI 排队后补充：`GeoShiftModule` 对时区、Locale、Geocoder、Wi-Fi、Telephony、CellIdentity 的安装/失败与部分命中/改写事件；Diagnostics 页面区分 `io.geoshift.system` 的系统全局安装证据与归因到 Profile 的事件；日志解析兼容 CRLF。
 - `HookAuditTest` 新增 CRLF 回归。所有观测状态仍表示历史、可伪造的日志证据，非实际隐私安全通过率；没有独立 Probe 的真实设备验证。
 - 旧的首轮 CI `39038527478` 仅覆盖较早快照，不可替代本次最终代码验证。记录下一次无 `[skip ci]` 提交对应的完整流水线作为**G03 最终验收**。
+
+## 2026-10-17 · Round 003 验收补录 — G03 CI PASS
+- **最终源码与测试提交**：`a68e68a58579f665919097508ca4ac5fddeb7d14`（含 G03 全部功能、修复、文档及单测）。
+- **CI 证据**：[GitHub Actions #39038730416](https://github.com/Becauseiloveyo/GeoShift/actions/runs/39038730416)，`completed / success`；job `117413766659`。
+- **实际通过步骤**：`gradle :app:testDebugUnitTest --stacktrace`、`gradle :app:assembleBenchmark :benchmark:assembleBenchmark --stacktrace`、`gradle :app:assembleDebug --stacktrace`、Debug APK 上传；构建日志依次显示 `BUILD SUCCESSFUL`（1m36s / 1m49s / 28s）。
+- **Artifact**：`GeoShift-debug-a68e68a58579f665919097508ca4ac5fddeb7d14`；GitHub Actions artifact ID `12103008910`；归档大小 `10,612,007 bytes`（不是 APK 内文件大小、签名状态或实机覆盖证据）。
+- **之前的工作流**：`#39038527478` 只验证了较早代码快照的 JVM 测试，随后因并发策略取消；不能作为最终提交的完整验收。本轮使用 `#39038730416`。
+- **任务结论**：**G03 = DONE（代码级 CI 门槛通过）**。诊断界面反映的是从用户手动导入、且可能伪造的历史日志观察；实际 Android 17 / HyperOS 真实 Hook 命中、真实值泄露和非目标应用隔离测试仍 **NOT RUN**，归 G08/G09。
+- **下一任务**：G04 定位 API 调用语义与回调正确性；重点禁止无权限或 null 返回路径被错误合成“成功定位”，验证取消、回调、缓存、注册与移除监听器，并按 SDK 适配异步 Geocoder。
