@@ -14,7 +14,7 @@ internal object SystemProfileSelector {
         stringArguments: Iterable<String>,
     ): SystemDeliveryTarget? {
         // Strict provider sessions never override Binder/UID-based per-app identity.
-        return stringArguments.asSequence()
+        val candidates = stringArguments.asSequence()
             .map(String::trim)
             .filter(String::isNotBlank)
             .filter(ownedPackages::contains)
@@ -23,6 +23,11 @@ internal object SystemProfileSelector {
                 val profile = snapshot.profiles[key] ?: return@mapNotNull null
                 if (!profile.enabled || !profile.locationEnabled) null else SystemDeliveryTarget(key)
             }
-            .firstOrNull()
+            .distinctBy { it.profileKey }
+            .take(2)
+            .toList()
+        // Shared UIDs and brokered calls may carry more than one plausible package.
+        // Ambiguous identities are NOT safe to attribute to a single profile.
+        return candidates.singleOrNull()
     }
 }
