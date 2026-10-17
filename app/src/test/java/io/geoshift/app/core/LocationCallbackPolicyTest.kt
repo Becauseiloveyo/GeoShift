@@ -31,6 +31,20 @@ class LocationCallbackPolicyTest {
         assertSame(empty, result)
     }
 
+    @Test fun emptyAndFailedGeocodeRepliesStayUnchanged() {
+        val empty = emptyList<String>()
+        assertSame(empty, LocationCallbackPolicy.replaceNonEmptySuccess(empty, true) {
+            listOf("fabricated")
+        })
+        val existing = listOf("original")
+        assertSame(existing, LocationCallbackPolicy.replaceNonEmptySuccess(existing, false) {
+            listOf("fabricated")
+        })
+        assertEquals(listOf("new"), LocationCallbackPolicy.replaceNonEmptySuccess(existing, true) {
+            listOf("new")
+        })
+    }
+
     @Test fun originalBatchIsNotMutatedAndOrderIsPreserved() {
         val original = listOf("one", "two")
         val result = LocationCallbackPolicy.transformList(original) { it.uppercase() }
