@@ -15,6 +15,12 @@ class GeoShiftStrictPackageModule : XposedModule() {
     override fun onPackageReady(param: PackageReadyParam) {
         if (!param.isFirstPackage) return
 
+        // G02 safety gate: private fused/AMap broker callbacks lack reliable final caller
+        // identity. Do not install broker-global rewrite or black-hole hooks until owned-device
+        // isolation tests prove the effect is bounded. No settings flag can bypass this gate.
+        log(Log.INFO, TAG, "Broker-global strict adapters disabled pending G08/G09 isolation validation")
+        return
+
         val prefs = runCatching { getRemotePreferences(ProfileStoreV2.REMOTE_PREFS) }
             .getOrElse {
                 log(Log.WARN, TAG, "Unable to open strict Remote Preferences in ${param.packageName}", it)
