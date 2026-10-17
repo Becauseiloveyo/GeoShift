@@ -31,3 +31,11 @@
 - **阶段性验证**：静态复核修改过的源码与测试逻辑；当前提交后的 GitHub CI 结果尚未确认，真机复测 **NOT RUN**。
 - **现有限制**：CLI stop 经 Remote Preferences 通知而非同步全链路屏障；缺应用内紧急停止 UI；实时地图和非目标应用对照由 G08/G09 实际验证。不得描述为“完全无泄漏”。
 - **下一步**：等效于原 CI 的新分支流水线必须通过 JVM tests、Macrobenchmark 编译、Debug APK build/upload，记录 run id/提交 SHA。若失败先修复，成功后 G02 可标 DONE（代码级），实机证据仍归 G09。
+
+## 2026-10-17 · Round 002 验收补录 — G02 CI PASS
+- **提交**：`467e2e6e5dbd207f816859d1339c9b55b13b7c2c`（G02 全部实际代码与测试、文档基线）。
+- **构建证据**：[GitHub Actions #39037167354](https://github.com/Becauseiloveyo/GeoShift/actions/runs/39037167354)，`completed / success`；job `117409282217`。
+- **通过步骤**：`gradle :app:testDebugUnitTest --stacktrace`、`gradle :app:assembleBenchmark :benchmark:assembleBenchmark --stacktrace`、`gradle :app:assembleDebug --stacktrace`、`Upload debug APK`，均成功。Gradle 日志显示三次 BUILD SUCCESSFUL：1m37s / 1m54s / 33s；未由 CI 提供精确执行用例总数，因此不推断测试总数。
+- **Artifact**：`GeoShift-debug-467e2e6e5dbd207f816859d1339c9b55b13b7c2c`，ID `12102812265`，GitHub artifact archive 10,590,742 bytes；不等同于真机安装、运行或隐私保护验证。
+- **任务结论**：**G02 = DONE（代码级、CI 验收）**。纯逻辑单测证实时间/开关/归因不变式，核心实验行为仍须 G08/G09 的 Android 17 / HyperOS 设备测试。
+- **下一任务**：G03 Hook 安装/命中/失败/未验证运行态诊断与身份隔离机制；先研究无敏感数据的事件计数与用户可见状态，再实现并验收。
