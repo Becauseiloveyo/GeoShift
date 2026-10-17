@@ -39,3 +39,15 @@
 - **Artifact**：`GeoShift-debug-467e2e6e5dbd207f816859d1339c9b55b13b7c2c`，ID `12102812265`，GitHub artifact archive 10,590,742 bytes；不等同于真机安装、运行或隐私保护验证。
 - **任务结论**：**G02 = DONE（代码级、CI 验收）**。纯逻辑单测证实时间/开关/归因不变式，核心实验行为仍须 G08/G09 的 Android 17 / HyperOS 设备测试。
 - **下一任务**：G03 Hook 安装/命中/失败/未验证运行态诊断与身份隔离机制；先研究无敏感数据的事件计数与用户可见状态，再实现并验收。
+
+## 2026-10-17 · Round 003 — G03 跨进程 Hook 诊断实施（待 CI）
+- **实施状态**：G03 = IMPLEMENTED_UNVERIFIED；Android CI 尚未确认。本轮不修改 VPN 隧道/代理/加密，不启用共享 Strict。
+- **接口核对**：libxposed 官方 `XposedInterface.getRemotePreferences` 明确指出在被 Hook 的进程中只读；不通过它向远端偏好写诊断结果。
+- **实现**：`HookAudit.kt` 定义有限字段和有限类别的可解析诊断格式；`HookAuditEmitter.kt` 在 Hook 处仅去重排队、异步写入 Xposed 日志；`GeoShiftModule.kt` 记录 App Location getter、framework last/current 的部分安装/命中/改写/失败事件；`SystemLocationDeliveryHooks.kt` 记录 system_server 上已按 Binder UID/包名归因的事件与安装失败/覆盖不足。
+- **界面**：新增 Diagnostics 导航、`GeoShiftDiagnosticsScreen.kt`；`MainActivity.kt` 通过系统文件选择器导入用户手动导出的 LSPosed/logcat 文本。解析长度上限 100 万字符、最多 2,000 条唯一事件；结果只在内存，退出后不上传、不持久化。
+- **身份隔离**：`SystemProfileSelector.select` 拒绝一个调用携带两个不同、同 UID 且启用的位置 Profile 包名，避免“只选第一个”的歧义；保留跨 Android user 和非拥有 UID 失败闭合逻辑。
+- **测试**：新增 `HookAuditTest.kt` 的格式/攻击字段/未知身份/优先级/边界测试；增加共享 UID、重复包名、跨用户隔离回归。
+- **隐私承诺**：事件没有坐标、网络地址、Wi-Fi/基站或密钥；**包名与日志时间本身仍可能敏感**。导入的文本可伪造，仅用于历史观测，不能当作 Hook 正确性、真实位置防泄漏或第三方平台账户合规证明。
+- **文档**：`docs/G03_HOOK_DIAGNOSTICS.md` 说明状态语义、日志导入限制、测试矩阵和可信度边界。
+- **未完成**：本轮代码的 GitHub Actions 完整结果仍需核实；设备上真实 API 的实际交付结果 **NOT RUN**，由 G08/G09 验证。
+- **下一步**：触发并审阅 Android CI；有编译/单测失败则修复并重跑；成功后更新 G03=DONE（代码级），再推进 G04。
