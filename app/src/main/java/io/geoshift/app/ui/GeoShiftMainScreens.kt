@@ -161,6 +161,7 @@ private fun DestinationContent(
         Destination.Overview -> OverviewScreen(state, apps, actions, padding)
         Destination.Profiles -> ProfilesScreen(state, apps, actions, padding)
         Destination.Providers -> ProvidersScreen(state, actions, padding)
+        Destination.Diagnostics -> DiagnosticsScreen(state, actions, padding)
     }
 }
 
@@ -168,6 +169,7 @@ private fun destinationIcon(destination: Destination): Int = when (destination) 
     Destination.Overview -> R.drawable.ms_home_24
     Destination.Profiles -> R.drawable.ms_apps_24
     Destination.Providers -> R.drawable.ms_settings_24
+    Destination.Diagnostics -> R.drawable.ms_warning_24
 }
 
 @Composable
@@ -175,6 +177,7 @@ private fun destinationLabel(destination: Destination): String = when (destinati
     Destination.Overview -> stringResource(R.string.nav_overview)
     Destination.Profiles -> stringResource(R.string.nav_profiles)
     Destination.Providers -> stringResource(R.string.nav_providers)
+    Destination.Diagnostics -> "Diagnostics"
 }
 
 @Composable
