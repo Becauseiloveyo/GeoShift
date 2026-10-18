@@ -178,6 +178,7 @@ class MainActivity : ComponentActivity() {
                         auditEvents = auditEvents,
                         auditLogStatus = auditLogStatus,
                         nativePermissions = nativePermissions,
+                        androidSdk = Build.VERSION.SDK_INT,
                         isSyncing = syncInFlight,
                         isRadioBusy = radioQueryInFlight,
                         editingProfile = editingProfile,
