@@ -184,7 +184,8 @@ def duration_seconds(start: str, end: str) -> float:
 
 
 def validate_continuity(reports: list[dict], session: str, revision: str,
-                        sdk: int) -> dict:
+                        sdk: int, manufacturer: str, model: str,
+                        grant: str) -> dict:
     """Require six independently exported target-active measurements over 30 minutes."""
     if len(reports) < 6 or len(reports) > 64:
         return {"status": "NOT_RUN", "samples": len(reports), "durationSeconds": 0}
@@ -194,7 +195,9 @@ def validate_continuity(reports: list[dict], session: str, revision: str,
         ensure(doc["role"] == "target" and doc["phase"] == "active",
                "Only target active reports allowed in continuity series")
         ensure(doc["session"] == session and doc["geoshiftSourceRevision"] == revision and
-               doc["androidSdk"] == sdk, "Continuity identity drift")
+               doc["androidSdk"] == sdk and doc.get("manufacturer") == manufacturer and
+               doc.get("model") == model and doc.get("locationGrant") == grant,
+               "Continuity device, source or location grant drift")
         timestamps = datetime.fromisoformat(doc["collectedAtUtc"].replace("Z", "+00:00"))
         observed.append(timestamps)
         matched = any(
@@ -233,9 +236,13 @@ def review(preflight_doc: dict, manual: dict, reports: list[dict],
         ensure(continuous_valid, "Cannot claim 30min PASS from insufficient samples")
 
     comparison = compare(reports)
+    target_active = next(doc for doc in reports
+                         if doc.get("role") == "target" and doc.get("phase") == "active")
     continuity = validate_continuity(
         continuity_reports or [], comparison["session"],
         comparison["geoshiftSourceRevision"], preflight_doc.get("androidSdk", -1),
+        target_active.get("manufacturer"), target_active.get("model"),
+        target_active.get("locationGrant"),
     )
     if checks["continuous_location_30min"] == "PASS" and continuity["status"] != "FAIL":
         ensure(continuity["status"] == "MEASURED",
@@ -246,7 +253,11 @@ def review(preflight_doc: dict, manual: dict, reports: list[dict],
         target_checks = [x for x in comparison["checks"] if x["role"] == "target"]
         ensure(any(x["status"] == "PASS" for x in target_checks),
                "Target PASS needs an observed target location match")
-    if preflight_doc.get("androidSdk") != reports[0].get("androidSdk"):
+    if (preflight_doc.get("androidSdk") != reports[0].get("androidSdk") or
+        (preflight_doc.get("manufacturer") is not None and
+         preflight_doc["manufacturer"] != reports[0].get("manufacturer")) or
+        (preflight_doc.get("model") is not None and
+         preflight_doc["model"] != reports[0].get("model"))):
         outcome = "BLOCKED"
     elif preflight_doc.get("status") != "READY_FOR_MANUAL_VALIDATION":
         outcome = "BLOCKED"
