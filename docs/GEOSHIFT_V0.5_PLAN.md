@@ -2,7 +2,7 @@
 
 > **唯一执行依据 / Single Source of Truth**
 >
-> 状态：**IN PROGRESS — G08 IMPLEMENTED_UNVERIFIED; CI PENDING**  
+> 状态：**IN PROGRESS — G00-G08 COMPLETE (code-level); G09 DEVICE EVIDENCE NEXT**  
 > 计划版本：1.0.0；建立日期：2026-10-17  
 > 仓库：`Becauseiloveyo/GeoShift`；开发分支：`feat/v0.5-privacy-reliability`  
 > 基线分支：`feat/v0.1-foundation`；基线提交：`31b14b46923c9f710936b4298e00231781c263f7`（2026-09-07）  
@@ -53,7 +53,7 @@
 | G05 | P1 | 原子地理 Profile、无线数据有效期 | v5 原子快照、Revision CAS、旧无线身份过期/停用与手动重新绑定；最终 CI #39092267241 全部成功，LSPosed 实机归 G08/G09 | DONE |
 | G06 | P1 | 原生隐私权限引导和诊断 UI | 原生授权只读快照、系统设置跳转、配置/Hook 日志/Probe 证据分离；最终 CI #39093873195 全部成功，设备操作留 G08/G09 | DONE |
 | G07 | P1 | 本地密钥、日志和导出卫生 | Keystore AES-256-GCM、旧明文迁移/失效恢复、错误脱敏、安全导出；最终 CI #39096242722 全部成功；真实 Keystore 及迁移留 G09 | DONE |
-| G08 | P1 | 独立自控 Probe 与对照测试 | 已提交 target+3 controls 独立 APK、Framework/Fused/Geocoder/Wi-Fi/Telephony 测量、脱敏 JSON 与八份报告校验器；等待 CI，设备 API 验收仍 NOT RUN (G09) | IMPLEMENTED_UNVERIFIED |
+| G08 | P1 | 独立自控 Probe 与对照测试 | target + 3 controls 独立 APK，Framework/Fused/Geocoder/Wi-Fi/Telephony 测量、脱敏 JSON 和 8 报告校验；完整 CI #39099797863 通过，实际设备隔离留 G09（NOT RUN） | DONE |
 | G09 | P1 | Android 17 / HyperOS 实机闭环 | 冷启动、前后台、位置变化、VPN GeoIP 同步、重启/停止、拒绝权限等实机矩阵；无 P0 遗留 | TODO |
 | G10 | P2 | 许可合规、性能回归与正式发布 | 许可证选择与第三方 NOTICE；CI、源码/APK/测试记录和 SHA256 对应；正式 Release 发布前须 G01-G09 门槛达标 | TODO |
 
@@ -121,7 +121,7 @@
 ## 6. 版本门禁与进度记账
 
 - **Alpha / GATE A**：G01-G04（2026-10-17 均有独立代码级 CI PASS），关键错误路径有自动化回归；真实设备仍需 G08/G09，关键错误路径有自动化回归。
-- **Beta / GATE B**：G05-G07 已有独立代码级 CI PASS；G08 独立 Probe 尚未完成。真实设备 G09 复验仍是不可跳过的门槛。
+- **Beta / GATE B**：G05-G08 的代码级构建及自动化测试已有独立 CI PASS；G08 的四 Probe 受控设备实测尚未运行，真实设备 G09 仍是不可跳过的门槛。
 - **Release Candidate / GATE C**：G09 在目标设备通过；没有已知 P0；尚未验证平台明确列为 NOT RUN。
 - **Stable / GATE D**：G10 完成，发布包哈希、许可和来源完整，使用范围限制已记录。
 
