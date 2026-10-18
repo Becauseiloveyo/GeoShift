@@ -177,3 +177,12 @@
 - **状态**：**G08 = DONE（独立 Probe 代码/自动化与 APK 构建门槛）**。Android 17 / HyperOS 的真实 4 安装包、权限、原生 API 行为、8 份基线/Active 报告、3 非目标对照、30 分钟持续定位、设备隔离真实性等均 **NOT RUN**，绝不假定 PASS。
 - **安全边界**：User-exported reports 及 HMAC 指纹不具设备硬件证明；无原始 GPS/SSID/BSSID/CellID 写入结构化结果，但报告的包名、机型、UTC 时间等仍可能敏感。理论上存在原生 GPS 暴露路径，不能用少量 PASS 推出全面零泄漏。
 - **下一任务**：G09 真机验证门槛。缺已连接/可控 Android 17/HyperOS 设备时记为 BLOCKED / NOT RUN 并交付操作指南、结果上传方案；不可未经用户参与擅自修改手机设置或触发全局 Strict。
+
+## 2026-10-18 · Round 009 — G09 真机验收工具交付，设备验收 BLOCKED
+- **计划和前提**：先读取 AGENTS.md、G09 计划、全部 G08 结果和现有 Probe、CI、报告脚本。真实 Android 17 / HyperOS 设备访问是 G09 **不可省略的必要条件**。本轮运行环境 `adb` 不可用且未发现已连接手机，**没有实际设备测量**、没有安装 APK、没有调整手机权限或 LSPosed Scope。
+- **新增工具**：`tools/g09_device_gate.py` 提供只读 ADB `preflight`（SDK/型号/主 App 和 4 Probe 安装状态，不保存设备序列号）；四 APK `manifest` / `verify-manifest` 产生/验证 SHA256 与 GitHub 完整源码提交；`review` 比较 G08 的 8 个两阶段报告、`docs/G09_DEVICE_MATRIX_TEMPLATE.json` 的 16 项自报检查、以及至少 6 个 target-active JSON 的真实记录时间跨越 30 分钟的证据。
+- **不允许虚假 PASS**：设备未连接则 BLOCKED；权限/设备型号/源码修订漂移拒绝合并结果；连续性仅用户声称采集 30 分钟但缺少独立 Probe 输出的情况不能完成；样本出现明显非目标位置则 FAIL。所有人工录入仍为 USER_REPORTED，不会产生硬件认证式的 PASS。即使六份报告跨 30 分钟也只是**离散采样证据**，不是零间断监听证明。
+- **构建验证**：修改 `.github/workflows/android.yml`：所有原 G08 CI 项不删减；每轮新添 Probe APK 的 SHA256 清单和自校验，和四 APK 一起上传 Artifact；`python3 -m unittest discover -s tools/tests -v` 自动包含新增 `test_g09_device_gate.py` 的只读/哈希/不完整/假 PASS/跨设备权限与 30 分钟校验测试。
+- **文档**：`docs/G09_ANDROID17_HYPEROS_DEVICE_ACCEPTANCE.md` 明确如何下载相同 CI 的两份 APK Artifact、校验哈希、手动安装、申请权限、保证只有唯一 Target 在 Scope、执行四应用对照、采集至少六份定时目标 Probe JSON、生成设备审查报告、手动清理；`docs/G09_DEVICE_MATRIX_TEMPLATE.json` 的 16 项状态初始均为 NOT_RUN。
+- **安全**：严格模式不自动启用；不提供账号风控绕过；不要求上传原始 GPS、SSID/BSSID、CellID、密钥、设备序列号或完整 logcat；设备状态只读，APK 安装命令仅在文档中由用户明确执行。
+- **状态**：**G09 = BLOCKED（真机运行 NOT RUN）**，不是 DONE；**G10 仍 TODO** 且正式发布不可放行。离线代码级 CI 运行结果应在后续补录，CI 成功也不解除缺设备阻塞。
