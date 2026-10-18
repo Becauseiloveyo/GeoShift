@@ -23,6 +23,7 @@ import io.geoshift.app.core.HookAuditEvent
 import io.geoshift.app.core.AndroidLocationPermissionReader
 import io.geoshift.app.core.NativeLocationAccess
 import io.geoshift.app.core.ProfileCodec
+import io.geoshift.app.core.ProfileExportPolicy
 import io.geoshift.app.core.ProfileStoreV2
 import io.geoshift.app.core.ProviderSettings
 import io.geoshift.app.core.ProviderCredentialStatus
@@ -78,9 +79,12 @@ class MainActivity : ComponentActivity() {
         if (uri == null || profile == null) return@registerForActivityResult
         runCatching {
             contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use {
-                it.write(ProfileCodec.encode(profile))
+                it.write(ProfileCodec.encode(ProfileExportPolicy.sanitized(profile)))
             } ?: error(getString(R.string.could_not_open_export))
-        }.onSuccess { showNotice(getString(R.string.profile_exported)) }
+        }.onSuccess {
+            showNotice("Profile exported without observed exit IP and radio identifiers. " +
+                "Configured target coordinates remain in this file; share with care.")
+        }
             .onFailure { toast(getString(R.string.export_failed, it.message.orEmpty())) }
     }
 
