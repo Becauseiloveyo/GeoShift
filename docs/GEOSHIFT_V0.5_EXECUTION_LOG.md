@@ -110,3 +110,14 @@
 - **最终状态**：G05 = **DONE（代码级 CI 门槛）**；Profile CAS / 过期策略的纯 JVM 测试实际成功。LSPosed Remote Preferences `commit/readback`、断电恢复、v1–v5 真实迁移、无线 Hook 的实际交付、非目标应用隔离与 Android 17/HyperOS 稳定性均 **NOT RUN**，列入 G08/G09。
 - **重要限制**：标记旧无线数据 stale 并停用模拟只使旧数据不再被当作当前城市数据，**系统原始无线信息仍可能透传**，不构成真实信息零泄漏保证。用户如需阻止相关 API 访问，应优先使用 Android 原生权限。
 - **下一任务**：G06 原生位置权限引导与诊断 UI 区分；先读本计划/本日志/最新代码，随后实现测试再通过新一轮 CI。
+
+## 2026-10-17 · Round 006 — G06 原生权限与独立证据诊断（CI 待验证）
+- **状态**：G06 = IMPLEMENTED_UNVERIFIED；实际 Android CI 未结束前不能标为 DONE。
+- **官方依据**：Android 12+（API 31+）的精确/大致授予由 Android 设置控制；权限降级可能导致目标应用进程重启，不能通过 GeoShift 自动修改第三方授权。
+- **新增模型**：`NativeLocationPermission.kt` 纯逻辑分类 UNKNOWN/NOT_REQUESTED/DENIED/APPROXIMATE/PRECISE；`AndroidLocationPermissionReader.kt` 读取 PackageManager 目标应用位置授权，查询错误或不可见保留 UNKNOWN。
+- **独立证据**：`PrivacyEvidenceSummary.kt` 将 Profile 配置完整度、历史 Hook 安装/命中/改写/失败计数及 Probe 测试状态严格分开；G08 尚未执行，因此实际 Probe 一律 NOT_RUN，即使配置得分为 100 或已导入 REWRITTEN 日志也不会显示 PASS。
+- **UI 实现**：`MainActivity` 在 `onResume` 和 Profile 刷新后重新查询目标包授权；Diagnostics 页每个 Profile 展示只读权限快照、单独配置分数、历史事件和实际 Probe 未测试状态；`Open Android app permissions` 只调用官方 `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`，不尝试授予、撤销第三方权限。Android 12 前不宣传精确度切换。
+- **测试**：新增 `NativeLocationPermissionTest.kt` 与 `PrivacyEvidenceSummaryTest.kt`；保留全部原有测试，不把旧 G05 CI 记作本轮通过。
+- **隐私边界**：PackageManager 数据不证明 AppOps、后台授权、系统定位开关、实际 API 值或网络侧地理信息；手动导入的 LSPosed/logcat 日志可以伪造。真实 Android 17/HyperOS 上的系统跳转与权限切换 **NOT RUN**（留 G08/G09）。
+- **文档**：`docs/G06_NATIVE_PERMISSIONS_AND_EVIDENCE.md`。
+- **下一步**：检查新的 G06 CI（unit tests、benchmark compile、debug build、upload）。失败要记录原因并修复；通过后把 G06 标记为 DONE（代码级），继续 G07 Keystore 密钥处理。
