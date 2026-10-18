@@ -15,6 +15,7 @@ class ProbeReportTest {
             model = "Test",
             appVersion = "0.5-g08",
             sourceRevision = "LOCAL_UNVERIFIED",
+            locationGrant = "FINE",
             recordedAtUtc = "2026-10-18T00:00:00Z",
             observations = listOf(ProbeObservation(
                 api = "framework", method = "getCurrentLocation",
