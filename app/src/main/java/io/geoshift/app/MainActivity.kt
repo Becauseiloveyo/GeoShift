@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.geoshift.app.core.GeoProfile
+import io.geoshift.app.core.confirmRadioForCurrentGeography
 import io.geoshift.app.core.HookAudit
 import io.geoshift.app.core.HookAuditEvent
 import io.geoshift.app.core.ProfileCodec
@@ -283,7 +284,7 @@ class MainActivity : ComponentActivity() {
                 if (updatedErrors.isNotEmpty()) error(localizedProfileError(updatedErrors.first()))
                 if (!ProfileStoreV2.save(service, outcome.profile)) error(getString(R.string.could_not_save_synced_profile))
                 runOnUiThread {
-                    editingProfile = outcome.profile
+                    editingProfile = ProfileStoreV2.load(service, outcome.profile.targetPackage) ?: outcome.profile
                     editingOriginalPackage = outcome.profile.targetPackage
                     syncStatus = "${outcome.geoIp.ip} · ${outcome.geoIp.city}, ${outcome.geoIp.countryCode}"
                     refreshProfiles(service)
@@ -439,25 +440,29 @@ class MainActivity : ComponentActivity() {
                         .joinToString(" + ")
 
                     val updated = profile.copy(
-                        wifiEnabled = if (primaryWifi != null) true else profile.wifiEnabled,
+                        wifiEnabled = primaryWifi != null || (!profile.radioStale && profile.wifiEnabled),
                         wifiSsid = primaryWifi?.ssid ?: profile.wifiSsid,
                         wifiBssid = primaryWifi?.bssid ?: profile.wifiBssid,
                         wifiRssiDbm = primaryWifi?.rssiDbm ?: profile.wifiRssiDbm,
-                        wifiAccessPoints = if (accessPoints.isNotEmpty()) accessPoints else profile.wifiAccessPoints,
-                        telephonyEnabled = if (nearestCell != null) true else profile.telephonyEnabled,
+                        wifiAccessPoints = if (accessPoints.isNotEmpty()) accessPoints else
+                            if (profile.radioStale) emptyList() else profile.wifiAccessPoints,
+                        telephonyEnabled = nearestCell != null || (!profile.radioStale && profile.telephonyEnabled),
                         mcc = nearestCell?.mcc?.toString()?.padStart(3, '0') ?: profile.mcc,
                         mnc = nearestCell?.mnc?.toString()?.padStart(2, '0') ?: profile.mnc,
                         cellRadio = nearestCell?.radio ?: profile.cellRadio,
                         cellAreaCode = nearestCell?.areaCode ?: profile.cellAreaCode,
                         cellId = nearestCell?.cellId ?: profile.cellId,
-                        radioSource = source.ifBlank { profile.radioSource.ifBlank { getString(R.string.provider_suggestion) } },
+                        radioSource = source.ifBlank { getString(R.string.provider_suggestion) },
+                    ).confirmRadioForCurrentGeography(
+                        source.ifBlank { getString(R.string.provider_suggestion) }
                     )
                     val errors = updated.validate()
                     if (errors.isNotEmpty()) error(localizedProfileError(errors.first()))
                     if (!ProfileStoreV2.save(service, updated)) error(getString(R.string.could_not_save_radio))
                     runOnUiThread {
                         refreshProfiles(service)
-                        editingProfile = editingProfile?.takeIf { it.targetPackage != updated.targetPackage } ?: updated
+                        editingProfile = editingProfile?.takeIf { it.targetPackage != updated.targetPackage }
+                            ?: ProfileStoreV2.load(service, updated.targetPackage) ?: updated
                         radioStatus = getString(R.string.radio_applied_format, appLabelFor(updated.targetPackage))
                         showNotice(radioStatus)
                     }
