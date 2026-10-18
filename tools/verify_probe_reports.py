@@ -50,6 +50,8 @@ def parse_report(doc: dict) -> dict:
              doc["androidSdk"] >= 29, "Invalid Android API")
     _require(isinstance(doc.get("geoshiftSourceRevision"), str) and
              bool(SHA.fullmatch(doc["geoshiftSourceRevision"])), "Invalid source revision")
+    _require(doc.get("locationGrant") in {"FINE", "COARSE", "NONE"},
+             "Missing location grant snapshot")
     _require(doc.get("redacted") is True, "Not a redacted report")
     _require(isinstance(doc.get("collectedAtUtc"), str) and
              doc["collectedAtUtc"].endswith("Z"), "Invalid timestamp")
@@ -100,6 +102,10 @@ def compare(reports: list[dict]) -> dict:
              "Device model mismatch")
     _require(len({d["geoshiftSourceRevision"] for d in parsed}) == 1,
              "GeoShift revision mismatch")
+    for role in ROLES:
+        _require(docs[role, "baseline"]["locationGrant"] ==
+                 docs[role, "active"]["locationGrant"],
+                 "Native location grant changed between phases for " + role)
 
     checks: list[dict] = []
     target = docs["target", "active"]
