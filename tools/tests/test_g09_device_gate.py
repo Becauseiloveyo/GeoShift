@@ -84,7 +84,7 @@ class G09DeviceGateTest(unittest.TestCase):
                 reply = "Xiaomi\n"
             elif args[-3:] == ["shell", "getprop", "ro.product.model"]:
                 reply = "Owned test phone\n"
-            elif args[-3:-1] == ["shell", "pm"]:
+            elif len(args) >= 5 and args[-4:-2] == ["shell", "pm"] and args[-2] == "path":
                 reply = "package:/data/app/fake/base.apk\n"
             else:
                 raise AssertionError("Unexpected command: " + repr(args))
