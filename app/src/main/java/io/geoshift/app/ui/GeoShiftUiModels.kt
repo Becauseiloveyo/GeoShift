@@ -4,6 +4,7 @@ import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.HookAuditEvent
 import io.geoshift.app.core.NativeLocationAccess
 import io.geoshift.app.core.ProviderSettings
+import io.geoshift.app.core.ProviderCredentialStatus
 
 enum class Destination { Overview, Profiles, Providers, Diagnostics }
 
@@ -16,6 +17,7 @@ data class GeoShiftUiState(
     val vpnActive: Boolean = false,
     val profiles: List<GeoProfile> = emptyList(),
     val providerSettings: ProviderSettings.Snapshot = ProviderSettings.Snapshot(),
+    val credentialStatus: ProviderCredentialStatus = ProviderCredentialStatus.EMPTY,
     val syncStatus: String = "No synchronization yet",
     val radioStatus: String = "Radio providers not configured",
     val notice: String? = null,
@@ -45,6 +47,7 @@ data class GeoShiftActions(
     val importAudit: () -> Unit,
     val openNativePermissions: (String) -> Unit,
     val saveProviders: (ProviderSettings.Snapshot) -> Unit,
+    val resetProviderCredentials: () -> Unit,
     val previewRadio: () -> Unit,
     val applyRadioSuggestion: () -> Unit,
     val clearNotice: () -> Unit,
