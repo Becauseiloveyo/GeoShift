@@ -2,7 +2,7 @@
 
 > **唯一执行依据 / Single Source of Truth**
 >
-> 状态：**IN PROGRESS — G00-G08 COMPLETE (code-level); G09 DEVICE EVIDENCE NEXT**  
+> 状态：**G00-G08 DONE (code-level); G09 BLOCKED — no connected Android 17 / HyperOS device; G10 release gated**  
 > 计划版本：1.0.0；建立日期：2026-10-17  
 > 仓库：`Becauseiloveyo/GeoShift`；开发分支：`feat/v0.5-privacy-reliability`  
 > 基线分支：`feat/v0.1-foundation`；基线提交：`31b14b46923c9f710936b4298e00231781c263f7`（2026-09-07）  
@@ -54,7 +54,7 @@
 | G06 | P1 | 原生隐私权限引导和诊断 UI | 原生授权只读快照、系统设置跳转、配置/Hook 日志/Probe 证据分离；最终 CI #39093873195 全部成功，设备操作留 G08/G09 | DONE |
 | G07 | P1 | 本地密钥、日志和导出卫生 | Keystore AES-256-GCM、旧明文迁移/失效恢复、错误脱敏、安全导出；最终 CI #39096242722 全部成功；真实 Keystore 及迁移留 G09 | DONE |
 | G08 | P1 | 独立自控 Probe 与对照测试 | target + 3 controls 独立 APK，Framework/Fused/Geocoder/Wi-Fi/Telephony 测量、脱敏 JSON 和 8 报告校验；完整 CI #39099797863 通过，实际设备隔离留 G09（NOT RUN） | DONE |
-| G09 | P1 | Android 17 / HyperOS 实机闭环 | 冷启动、前后台、位置变化、VPN GeoIP 同步、重启/停止、拒绝权限等实机矩阵；无 P0 遗留 | TODO |
+| G09 | P1 | Android 17 / HyperOS 实机闭环 | 已提交只读 ADB 预检、四 Probe APK SHA256 清单、16 项测试矩阵与 30 分钟多报告证据审查工具；当前无连接的受控 Android 17/HyperOS 设备，实机运行 NOT RUN，需设备证据后解除阻塞 | BLOCKED |
 | G10 | P2 | 许可合规、性能回归与正式发布 | 许可证选择与第三方 NOTICE；CI、源码/APK/测试记录和 SHA256 对应；正式 Release 发布前须 G01-G09 门槛达标 | TODO |
 
 **执行依赖**：G01 → G02/G03 → G04 → G05/G06/G07 → G08 → G09 → G10。可在不改变安全边界前提下合并提交，但不得跳过验收门槛。
