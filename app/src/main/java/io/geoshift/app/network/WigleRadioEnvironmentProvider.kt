@@ -36,7 +36,7 @@ class WigleRadioEnvironmentProvider(
                 ?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (connection.responseCode !in 200..299) error("WiGLE HTTP ${connection.responseCode}")
             val json = JSONObject(body)
-            if (!json.optBoolean("success", false)) error(json.optString("message", "WiGLE request failed"))
+            if (!json.optBoolean("success", false)) error("WiGLE provider rejected request")
             val results = json.optJSONArray("results") ?: return emptyList()
             return buildList {
                 for (i in 0 until results.length()) {
