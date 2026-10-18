@@ -32,7 +32,7 @@ class OpenCellIdRadioEnvironmentProvider(
                 ?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (connection.responseCode !in 200..299) error("OpenCellID HTTP ${connection.responseCode}")
             val json = JSONObject(body)
-            if (json.has("error")) error(json.optString("error", "OpenCellID request failed"))
+            if (json.has("error")) error("OpenCellID provider rejected request")
             val cells = json.optJSONArray("cells") ?: return emptyList()
             return buildList {
                 for (i in 0 until cells.length()) {
