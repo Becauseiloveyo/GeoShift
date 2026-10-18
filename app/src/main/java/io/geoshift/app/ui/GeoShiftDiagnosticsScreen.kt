@@ -18,6 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.geoshift.app.core.HookAudit
 import io.geoshift.app.core.HookAuditStatus
+import io.geoshift.app.core.NativeLocationAccess
+import io.geoshift.app.core.PrivacyEvidence
+import io.geoshift.app.core.ProbeOutcome
 
 /**
  * G03: imported hook-log evidence, not a live security measurement.
@@ -58,6 +61,11 @@ internal fun DiagnosticsScreen(
                 )
                 Text(state.auditLogStatus, style = MaterialTheme.typography.labelMedium)
                 Button(onClick = actions.importAudit) { Text("Import Xposed / logcat text") }
+                Text(
+                    "A configuration score is not privacy protection. Grant snapshots, " +
+                        "historical Hook evidence, and actual Probe results are independent.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
         item {
@@ -90,9 +98,50 @@ internal fun DiagnosticsScreen(
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(profile.targetPackage, style = MaterialTheme.typography.titleMedium)
+                        val permission = state.nativePermissions[profile.targetPackage]
+                            ?: NativeLocationAccess.UNKNOWN
+                        val evidence = PrivacyEvidence.summarize(
+                            profile, permission, state.auditEvents,
+                        )
+                        Text(
+                            "Configuration completeness: ${evidence.configurationScore}/100 — not a protection score",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            "Android location permission: ${permissionLabel(permission)} (read-only snapshot)",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Button(onClick = { actions.openNativePermissions(profile.targetPackage) }) {
+                            Text("Open Android app permissions")
+                        }
+                        Text(
+                            when (permission) {
+                                NativeLocationAccess.PRECISE ->
+                                    "If precision is unnecessary, select Approximate or Deny in Android settings."
+                                NativeLocationAccess.APPROXIMATE ->
+                                    "Approximate location is granted; deny it if no location access is required."
+                                NativeLocationAccess.DENIED ->
+                                    "Location is not currently granted; other signals can still reveal region."
+                                NativeLocationAccess.NOT_REQUESTED ->
+                                    "The app does not declare fine/coarse location permissions."
+                                NativeLocationAccess.UNKNOWN ->
+                                    "Package visibility or read errors prevent an accurate grant snapshot."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            "Actual API / cross-app Probe: ${evidence.probeOutcome.name} (no results imported)",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            "Historical Hook evidence: installed=${evidence.installedSurfaces}, " +
+                                "hit=${evidence.hitSurfaces}, rewritten=${evidence.rewrittenSurfaces}, " +
+                                "failed=${evidence.failedSurfaces}. Log events can be forged.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                         Text(
                             "Profile ${if (profile.enabled) "enabled" else "disabled"} · " +
-                                "Log events are historical and may be stale.",
+                                "Historical event details (not live proof):",
                             style = MaterialTheme.typography.labelSmall,
                         )
                         surfaces.forEach { (surface, label) ->
@@ -114,7 +163,9 @@ internal fun DiagnosticsScreen(
                 "Installed = installation event reported; Hit = call observed; " +
                     "Rewritten = a replacement was reported; Failed = failure reported. " +
                     "Identity unknown never counts as a verified Hit or Rewritten. " +
-                    "Use a separate Probe on owned devices for actual output/isolation verification.",
+                    "Use a separate Probe on owned devices for actual output/isolation verification. " +
+                    "Android Settings manages native grants; GeoShift cannot change them " +
+                    "or certify background location, AppOps, or server-side location sources.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -128,4 +179,13 @@ private fun statusLabel(value: HookAuditStatus): String = when (value) {
     HookAuditStatus.REWRITTEN -> "Rewritten"
     HookAuditStatus.FAILED -> "Failed"
     HookAuditStatus.NOT_COVERED -> "Not covered"
+}
+
+
+private fun permissionLabel(value: NativeLocationAccess): String = when (value) {
+    NativeLocationAccess.UNKNOWN -> "Unknown"
+    NativeLocationAccess.NOT_REQUESTED -> "Not requested"
+    NativeLocationAccess.DENIED -> "Denied / not granted"
+    NativeLocationAccess.APPROXIMATE -> "Approximate (coarse)"
+    NativeLocationAccess.PRECISE -> "Precise (fine)"
 }
