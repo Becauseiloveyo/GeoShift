@@ -22,6 +22,7 @@ data class GeoShiftUiState(
     val auditEvents: List<HookAuditEvent> = emptyList(),
     val auditLogStatus: String = "No diagnostic evidence imported",
     val nativePermissions: Map<String, NativeLocationAccess> = emptyMap(),
+    val androidSdk: Int = 0,
     val isSyncing: Boolean = false,
     val isRadioBusy: Boolean = false,
     val editingProfile: GeoProfile? = null,
