@@ -50,9 +50,11 @@ object ProfileStoreV2 {
         val storedTarget = prefs.getString(key(packageName, ProfileStore.KEY_TARGET_PACKAGE), null)
         if (storedTarget == null) {
             val legacyTarget = prefs.getString(ProfileStore.KEY_TARGET_PACKAGE, "").orEmpty()
-            return if (legacyTarget == packageName) ProfileStore.load(prefs) else null
+            return if (legacyTarget == packageName) ProfileStore.load(prefs).let { legacy ->
+                legacy.copy(radioStale = legacy.followVpn && (legacy.wifiEnabled || legacy.telephonyEnabled))
+            } else null
         }
-        return GeoProfile(
+        val legacy = GeoProfile(
             enabled = prefs.getBoolean(key(packageName, ProfileStore.KEY_ENABLED), true),
             targetPackage = storedTarget,
             followVpn = prefs.getBoolean(key(packageName, ProfileStore.KEY_FOLLOW_VPN), false),
@@ -84,6 +86,11 @@ object ProfileStoreV2 {
             lastSyncCity = prefs.getString(key(packageName, ProfileStore.KEY_LAST_SYNC_CITY), "").orEmpty(),
             lastSyncRegion = prefs.getString(key(packageName, ProfileStore.KEY_LAST_SYNC_REGION), "").orEmpty(),
             lastSyncAtEpochMs = prefs.getLong(key(packageName, ProfileStore.KEY_LAST_SYNC_AT), 0L),
+        )
+        // Old Follow-VPN radio provenance is ambiguous. Keep values available for
+        // manual recovery, but don't silently claim them current after migration.
+        return legacy.copy(
+            radioStale = legacy.followVpn && (legacy.wifiEnabled || legacy.telephonyEnabled),
         )
     }
 
