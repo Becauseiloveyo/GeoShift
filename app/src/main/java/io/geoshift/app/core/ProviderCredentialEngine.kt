@@ -91,7 +91,7 @@ class ProviderCredentialEngine(
             }.getOrNull() ?: return CredentialRead(status = ProviderCredentialStatus.RECOVERY_REQUIRED)
             // If an earlier cleanup failed, never use plaintext; retry removing it.
             if (storage.hasLegacyKeys() && !storage.commitEncryptedAndClearLegacy(encrypted)) {
-                return CredentialRead(decrypted, ProviderCredentialStatus.CLEANUP_FAILED)
+                return CredentialRead(status = ProviderCredentialStatus.CLEANUP_FAILED)
             }
             return CredentialRead(decrypted, ProviderCredentialStatus.READY)
         }
