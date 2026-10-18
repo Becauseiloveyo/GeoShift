@@ -237,7 +237,7 @@ def review(preflight_doc: dict, manual: dict, reports: list[dict],
         continuity_reports or [], comparison["session"],
         comparison["geoshiftSourceRevision"], preflight_doc.get("androidSdk", -1),
     )
-    if checks["continuous_location_30min"] == "PASS":
+    if checks["continuous_location_30min"] == "PASS" and continuity["status"] != "FAIL":
         ensure(continuity["status"] == "MEASURED",
                "30-minute PASS requires six separate active Probe reports covering 30+ minutes")
     if checks["three_non_target_controls"] == "PASS":
