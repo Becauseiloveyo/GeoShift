@@ -35,6 +35,10 @@ jobs:
         run: gradle :app:assembleBenchmark :benchmark:assembleBenchmark --stacktrace
       - name: Build debug APK and independent Probe variants
         run: gradle :app:assembleDebug :probe:assembleDebug --stacktrace
+      - name: Generate and verify Probe APK SHA256 manifest
+        run: |
+          python3 tools/g09_device_gate.py manifest --apk-root probe/build/outputs/apk --revision "${{ github.sha }}" --output probe/build/outputs/apk/probe-build-manifest.json
+          python3 tools/g09_device_gate.py verify-manifest --apk-root probe/build/outputs/apk --manifest probe/build/outputs/apk/probe-build-manifest.json
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -46,7 +50,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: GeoShift-Probe-four-variants-${{ github.sha }}
-          path: probe/build/outputs/apk/*/debug/*.apk
+          path: |
+            probe/build/outputs/apk/*/debug/*.apk
+            probe/build/outputs/apk/probe-build-manifest.json
           if-no-files-found: error
           retention-days: 14
       - name: Verify Probe report analyzer
