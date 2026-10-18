@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object ProfileCodec {
-    private const val SCHEMA_VERSION = 4
+    private const val SCHEMA_VERSION = 5
 
     fun encode(profile: GeoProfile): String = JSONObject().apply {
         put("schemaVersion", SCHEMA_VERSION)
@@ -52,6 +52,11 @@ object ProfileCodec {
             put("lastSyncCity", profile.lastSyncCity)
             put("lastSyncRegion", profile.lastSyncRegion)
             put("lastSyncAtEpochMs", profile.lastSyncAtEpochMs)
+            put("revision", profile.revision)
+            put("geoRevision", profile.geoRevision)
+            put("radioGeoRevision", profile.radioGeoRevision)
+            put("radioStale", profile.radioStale)
+            put("geoSource", profile.geoSource)
         })
     }.toString(2)
 
@@ -90,6 +95,11 @@ object ProfileCodec {
             lastSyncCity = json.optString("lastSyncCity", ""),
             lastSyncRegion = json.optString("lastSyncRegion", ""),
             lastSyncAtEpochMs = json.optLong("lastSyncAtEpochMs", 0L),
+            revision = json.optLong("revision", 0L),
+            geoRevision = json.optLong("geoRevision", 0L),
+            radioGeoRevision = json.optLong("radioGeoRevision", 0L),
+            radioStale = json.optBoolean("radioStale", false),
+            geoSource = json.optString("geoSource", ""),
         )
     }
 
