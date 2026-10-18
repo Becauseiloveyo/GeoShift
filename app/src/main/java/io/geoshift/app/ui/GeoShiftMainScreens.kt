@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -61,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import io.geoshift.app.R
 import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.ProviderSettings
+import io.geoshift.app.core.ProviderCredentialStatus
 
 private enum class ProfileSort(val labelRes: Int) {
     Recent(R.string.sort_recent),
@@ -579,6 +581,34 @@ private fun ProvidersScreen(
     var wigleName by remember(state.providerSettings) { mutableStateOf(state.providerSettings.wigleTokenName) }
     var wigleToken by remember(state.providerSettings) { mutableStateOf(state.providerSettings.wigleToken) }
     var revealSecrets by rememberSaveable { mutableStateOf(false) }
+    var confirmCredentialReset by rememberSaveable { mutableStateOf(false) }
+    val recoveryRequired = state.credentialStatus == ProviderCredentialStatus.RECOVERY_REQUIRED ||
+        state.credentialStatus == ProviderCredentialStatus.MIGRATION_FAILED ||
+        state.credentialStatus == ProviderCredentialStatus.CLEANUP_FAILED
+
+    if (confirmCredentialReset) {
+        AlertDialog(
+            onDismissRequest = { confirmCredentialReset = false },
+            title = { Text("Reset provider credentials?") },
+            text = { Text(
+                "This permanently removes saved OpenCellID/WiGLE credentials, including " +
+                    "any remaining legacy plaintext. Existing provider access will stop " +
+                    "until you enter new credentials. This cannot be undone."
+            ) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmCredentialReset = false
+                    actions.resetProviderCredentials()
+                    openCell = ""
+                    wigleName = ""
+                    wigleToken = ""
+                }) { Text("Reset credentials") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmCredentialReset = false }) { Text("Cancel") }
+            },
+        )
+    }
 
     Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
@@ -603,6 +633,28 @@ private fun ProvidersScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Text(
+                        when (state.credentialStatus) {
+                            ProviderCredentialStatus.EMPTY ->
+                                "No provider credentials saved. New credentials are sealed with Android Keystore."
+                            ProviderCredentialStatus.READY ->
+                                "Credentials encrypted at rest with Android Keystore (AES-GCM)."
+                            ProviderCredentialStatus.MIGRATION_FAILED ->
+                                "Legacy plaintext migration failed; credentials are disabled until secure storage works."
+                            ProviderCredentialStatus.RECOVERY_REQUIRED ->
+                                "Encrypted credentials unavailable or damaged. They are disabled; reset only if you can re-enter them."
+                            ProviderCredentialStatus.CLEANUP_FAILED ->
+                                "Legacy plaintext cleanup failed; credentials are disabled until securely repaired."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (recoveryRequired) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (recoveryRequired) {
+                        OutlinedButton(onClick = { confirmCredentialReset = true }) {
+                            Text("Reset inaccessible provider credentials")
+                        }
+                    }
                     OutlinedTextField(
                         value = openCell,
                         onValueChange = { openCell = it.trim() },
@@ -640,6 +692,7 @@ private fun ProvidersScreen(
                             )
                         },
                         modifier = Modifier.fillMaxWidth(),
+                        enabled = !recoveryRequired,
                     ) { Text(stringResource(R.string.save_provider_settings)) }
                 }
             }
