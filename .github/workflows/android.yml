@@ -31,8 +31,8 @@ jobs:
         run: gradle :app:testDebugUnitTest --stacktrace
       - name: Compile Macrobenchmark suite
         run: gradle :app:assembleBenchmark :benchmark:assembleBenchmark --stacktrace
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+      - name: Build debug APK and independent Probe variants
+        run: gradle :app:assembleDebug :probe:assembleDebug --stacktrace
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -40,3 +40,12 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+      - name: Upload standalone Probe APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: GeoShift-Probe-four-variants-${{ github.sha }}
+          path: probe/build/outputs/apk/*/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verify Probe report analyzer
+        run: python3 -m unittest discover -s tools/tests -v
