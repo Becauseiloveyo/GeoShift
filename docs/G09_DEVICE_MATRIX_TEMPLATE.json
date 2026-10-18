@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "evidenceOrigin": "USER_REPORTED",
+  "checks": {
+    "location_permissions": "NOT_RUN",
+    "profile_target_sole_scope": "NOT_RUN",
+    "strict_disabled_in_normal_mode": "NOT_RUN",
+    "target_framework_and_fused": "NOT_RUN",
+    "three_non_target_controls": "NOT_RUN",
+    "null_cancel_timeout": "NOT_RUN",
+    "geocoder_async": "NOT_RUN",
+    "wifi_cell_staleness": "NOT_RUN",
+    "follow_vpn_profile_sync": "NOT_RUN",
+    "foreground_background": "NOT_RUN",
+    "continuous_location_30min": "NOT_RUN",
+    "strict_manual_timeout_stop": "NOT_RUN",
+    "stop_and_force_close_restore": "NOT_RUN",
+    "device_reboot_restore": "NOT_RUN",
+    "keystore_migration_recovery": "NOT_RUN",
+    "profile_export_redaction": "NOT_RUN"
+  },
+  "continuous30": {
+    "startUtc": "2026-10-18T00:00:00Z",
+    "endUtc": "2026-10-18T00:00:00Z",
+    "observedSampleCount": 0,
+    "unexpectedReturnCount": 0
+  }
+}
