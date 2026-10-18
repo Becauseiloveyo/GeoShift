@@ -166,3 +166,14 @@
 - **首轮运行**：#39099592799 由提交 `7443147a6ec91ae295e39e3b0aa953d2ed344d39` 触发；在后续代码复核时，主应用与四 Probe Flavor 的 JVM tests 已明确通过，Benchmark/Debug APK/脚本仍按最终 CI 完整核验，不混用提交证据。
 - **后续修复**：API 29 (Android 10) 对 API 30 的 `LocationManager.getCurrentLocation` 与 `CellInfo.getCellIdentity` 标记 `UNSUPPORTED`，不调用高版本原生接口；目标 baseline 不自动记为模拟目标失败；保存原生 FINE/COARSE/NONE 授权快照，权限在 baseline 与 active 两阶段变化时离线分析器拒绝比较；`NOT_RUN` 退出码为 3。移除概率性不稳定测试断言。
 - **最终代码要求**：包含上述补丁的最后提交才是正式 CI 依据。不得将四 APK 构建视为真机功能验收；G08 的真实 8 份设备报告仍 NOT RUN。
+
+### Round 008 G08 最终验收 · Probe 代码和 CI PASS
+- **最终受测源码提交**：`7a03d0f3248c2af241e9d53818ba80dd13b0ea8f`。包含 4 Flavor 独立 Probe Android 应用、原生 API 调用、脱敏 JSON/HMAC 指纹、受控权限与两阶段会话、8 报告比较脚本、Kotlin/Python 回归测试、CI 和协议文档。
+- **CI**：[GitHub Actions #39099797863](https://github.com/Becauseiloveyo/GeoShift/actions/runs/39099797863)，job `117593577439`，`completed / success`。
+- **实际通过命令**：`gradle :app:testDebugUnitTest --stacktrace`（BUILD SUCCESSFUL in 1m31s）；`gradle :probe:testTargetDebugUnitTest :probe:testControl1DebugUnitTest :probe:testControl2DebugUnitTest :probe:testControl3DebugUnitTest --stacktrace`（BUILD SUCCESSFUL in 17s）；`gradle :app:assembleBenchmark :benchmark:assembleBenchmark --stacktrace`（BUILD SUCCESSFUL in 1m25s，仅编译）；`gradle :app:assembleDebug :probe:assembleDebug --stacktrace`（BUILD SUCCESSFUL in 27s），主 APK、Probe APK Artifact 上传成功。独立 `python3 -m unittest discover -s tools/tests -v` 日志明确报告 `Ran 11 tests` 与 `OK`。
+- **主 APK Artifact**：`GeoShift-debug-7a03d0f3248c2af241e9d53818ba80dd13b0ea8f`，ID `12126366483`，归档大小 `10,648,404 bytes`。
+- **四 Probe APK Artifact**：`GeoShift-Probe-four-variants-7a03d0f3248c2af241e9d53818ba80dd13b0ea8f`，ID `12126366485`，归档大小 `9,452,783 bytes`；已通过四 Flavor 的测试任务与聚合 APK 构建。尚未实际解压逐个核对独立 APK 文件 SHA256 或在手机安装。以上大小均为 GitHub Artifact 归档大小，非单个 APK。
+- **上一轮快照的 CI**：`#39099592799` 仅用于较早源码的初步 JVM 反馈，因随后代码修订、并发重跑而不作为最终验收。
+- **状态**：**G08 = DONE（独立 Probe 代码/自动化与 APK 构建门槛）**。Android 17 / HyperOS 的真实 4 安装包、权限、原生 API 行为、8 份基线/Active 报告、3 非目标对照、30 分钟持续定位、设备隔离真实性等均 **NOT RUN**，绝不假定 PASS。
+- **安全边界**：User-exported reports 及 HMAC 指纹不具设备硬件证明；无原始 GPS/SSID/BSSID/CellID 写入结构化结果，但报告的包名、机型、UTC 时间等仍可能敏感。理论上存在原生 GPS 暴露路径，不能用少量 PASS 推出全面零泄漏。
+- **下一任务**：G09 真机验证门槛。缺已连接/可控 Android 17/HyperOS 设备时记为 BLOCKED / NOT RUN 并交付操作指南、结果上传方案；不可未经用户参与擅自修改手机设置或触发全局 Strict。
