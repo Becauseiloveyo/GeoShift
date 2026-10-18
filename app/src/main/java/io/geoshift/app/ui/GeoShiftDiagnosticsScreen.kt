@@ -20,7 +20,6 @@ import io.geoshift.app.core.HookAudit
 import io.geoshift.app.core.HookAuditStatus
 import io.geoshift.app.core.NativeLocationAccess
 import io.geoshift.app.core.PrivacyEvidence
-import io.geoshift.app.core.ProbeOutcome
 
 /**
  * G03: imported hook-log evidence, not a live security measurement.
@@ -117,7 +116,9 @@ internal fun DiagnosticsScreen(
                         Text(
                             when (permission) {
                                 NativeLocationAccess.PRECISE ->
-                                    "If precision is unnecessary, select Approximate or Deny in Android settings."
+                                    if (state.androidSdk >= 31)
+                                        "If precision is unnecessary, select Approximate or Deny in Android settings."
+                                    else "If location is unnecessary, deny it in Android settings."
                                 NativeLocationAccess.APPROXIMATE ->
                                     "Approximate location is granted; deny it if no location access is required."
                                 NativeLocationAccess.DENIED ->
