@@ -130,3 +130,13 @@
 - **完成状态**：**G06 = DONE（代码级 CI 门槛）**。自动化测试覆盖权限分类、未知结果保留、配置 100 分不等于 Probe PASS、历史 Hook 证据不得升级为实际结果；精确用例总数未独立核对，不虚构。
 - **设备验证仍 NOT RUN**：目标包可见性及 PackageManager 返回值、Android 17/HyperOS 应用设置跳转与权限切换、AppOps/后台授权、权限降级后的应用进程重启、LSPosed 与 API 返回值。均归 G08/G09。
 - **下一任务**：G07 Android Keystore 本地 provider API key 保护、迁移/损坏回退、默认日志与导出脱敏；继续遵守不扩展 VPN/代理与风控绕过的约束。
+
+## 2026-10-18 · Round 007 — G07 加密本地 Provider 凭据与导出卫生（CI 待验收）
+- **状态**：G07 = IMPLEMENTED_UNVERIFIED，未拿到最终 GitHub Actions 结果前不记为 DONE。
+- **已实际提交**：`ProviderCredentialEngine.kt` 为纯 JVM 可测的密文+清理旧明文原子提交协议；`AndroidProviderCredentialCipher.kt` 为 AndroidKeyStore AES-256-GCM（平台生成随机 96-bit IV、128-bit Tag 和固定 AAD）；`ProviderSettings.kt` 只从密文加载，不允许不可解密密文回退为明文。
+- **迁移失败与恢复**：第一次载入时对旧 `opencellid_api_key`、`wigle_token_name`、`wigle_token` 加密；同步提交密文和删除旧键；保存失败旧值保留但不启用；损坏/密钥丢失/清理失败时 fail closed；用户须在 Providers 页二次确认才可擦除不可恢复凭据后重新输入。
+- **界面**：`MainActivity` 保存 Provider 凭据时区分真实成功、存储失败和恢复需求；`GeoShiftMainScreens.kt` 显示凭据状态及破坏性操作确认，不输出原始加解密异常堆栈。
+- **日志及导出**：对服务端错误信息和上游 Throwable 文本使用固定无敏感内容提示；`ProfileExportPolicy` 默认移除出口 IP、SSID/BSSID、运营商和基站身份等已观测无线标识。用户配置的模拟目标经纬度必须保留才能重新导入，故不能称“导出无位置数据”，但路径没有读取手机真实 GPS。API key/token 不属于 ProfileCodec 序列化字段。
+- **测试**：`ProviderCredentialEngineTest.kt` 用受控伪加密/伪持久化验证迁移成功失败、密文损坏、失效恢复及明文清除；`ProfileExportPolicyTest.kt` 验证敏感元数据默认移除且不修改原配置。**AndroidKeystore 真实硬件加解密、迁移、备份恢复和系统异常 NOT RUN**，归 G09。
+- **文档**：`docs/G07_KEYSTORE_AND_EXPORT_SECURITY.md` 说明威胁模型、不可逆恢复、用户导出风险及实机矩阵。
+- **后续检查**：以新分支提交的 JVM tests、Macrobenchmark 编译、Debug APK build/upload 全部成功为代码级门槛。若失败先记录错误并修复，再重试；成功才标 G07=DONE，下一任务 G08 Probe。
