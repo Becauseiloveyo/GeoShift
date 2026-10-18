@@ -98,7 +98,7 @@ class ProviderCredentialEngineTest {
         storage.permitWrites = false
         val read = ProviderCredentialEngine(storage, crypto).read()
         assertEquals(ProviderCredentialStatus.CLEANUP_FAILED, read.status)
-        assertEquals(old, read.credentials)
+        assertTrue(read.credentials.isEmpty())
         assertTrue(storage.legacyKeys)
     }
 
