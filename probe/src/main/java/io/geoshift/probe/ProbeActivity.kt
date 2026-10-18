@@ -142,7 +142,7 @@ class ProbeActivity : Activity() {
         exportButton.isEnabled = false
         lastReport = null
         output.text = "Measuring 10 API surfaces; each async call has a bounded timeout…"
-        val config = ProbeConfig(secret, latitude, longitude, BuildConfig.PROBE_ROLE)
+        val config = ProbeConfig(secret, latitude, longitude, BuildConfig.PROBE_ROLE, phase)
         worker.execute {
             try {
                 val observations = ProbeEngine(this, config).run()
