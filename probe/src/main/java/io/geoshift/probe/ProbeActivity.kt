@@ -2,6 +2,7 @@ package io.geoshift.probe
 
 import android.Manifest
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -156,6 +157,13 @@ class ProbeActivity : Activity() {
                     model = Build.MODEL,
                     appVersion = BuildConfig.VERSION_NAME,
                     sourceRevision = BuildConfig.SOURCE_REVISION,
+                    locationGrant = when {
+                        checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+                            PackageManager.PERMISSION_GRANTED -> "FINE"
+                        checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                            PackageManager.PERMISSION_GRANTED -> "COARSE"
+                        else -> "NONE"
+                    },
                     recordedAtUtc = ProbeReportCodec.newTimestamp(),
                     observations = observations,
                 )
