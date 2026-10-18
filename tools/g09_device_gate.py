@@ -250,8 +250,8 @@ def review(preflight_doc: dict, manual: dict, reports: list[dict],
         outcome = "BLOCKED"
     elif preflight_doc.get("status") != "READY_FOR_MANUAL_VALIDATION":
         outcome = "BLOCKED"
-    elif "FAIL" in checks.values() or comparison["overall"] == "FAIL" or
-        continuity["status"] == "FAIL":
+    elif ("FAIL" in checks.values() or comparison["overall"] == "FAIL" or
+          continuity["status"] == "FAIL"):
         outcome = "FAIL_REPORTED"
     elif comparison["overall"] != "PASS" or "NOT_RUN" in checks.values():
         outcome = "NOT_RUN"
