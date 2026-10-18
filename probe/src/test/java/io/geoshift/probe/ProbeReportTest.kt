@@ -46,7 +46,7 @@ class ProbeReportTest {
         assertNull(ProbeFingerprint.location("short", 35.0, 139.0))
         val fp = ProbeFingerprint.location("long-private-lab-secret", 35.0, 139.0)
         assertEquals(32, fp?.length)
-        assertFalse(fp!!.contains("139"))
+        assertTrue(fp!!.matches(Regex("[a-f0-9]{32}"))) 
         assertEquals(fp, ProbeFingerprint.location("long-private-lab-secret", 35.0, 139.0))
         assertNotEquals(fp, ProbeFingerprint.location("different-private-secret", 35.0, 139.0))
     }
