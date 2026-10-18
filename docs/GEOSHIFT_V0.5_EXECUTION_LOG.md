@@ -149,3 +149,14 @@
 - **任务结果**：**G07 = DONE（代码级、完整 CI 门槛）**；自动化只测试 JVM 模型/迁移与导出策略，未宣称加密密钥在真实 Android 17/HyperOS 中已存取成功或硬件支持等级。
 - **重要隐私边界**：默认 Profile Export 去除公共出口 IP 与无线/蜂窝身份，但保留用户配置的模拟目的地坐标，仍须审慎分享；`ProfileCodec` 的应用内部 v5 快照不做破坏性脱敏。升级前残留在物理存储块/外部备份的旧明文无法通过 SharedPreferences `remove` 保证彻底擦除。设备和 Keystore 恢复验证 **NOT RUN**，归 G09。
 - **下一任务**：G08 实现可独立安装/卸载的自有 Probe 测试应用，并记录 API 调用期望、实际状态、非目标对照、脱敏结构化报告及验证来源；不得在真实第三方账号上做实验。
+
+## 2026-10-18 · Round 008 — G08 独立 Probe 与三对照报告（CI 待完成）
+- **状态**：G08 = IMPLEMENTED_UNVERIFIED；还未获得本轮 GitHub Actions 的测试与四 APK 构建证据。真实设备交付 **NOT RUN**。
+- **独立安装**：新 `:probe` 模块有四种 Android 应用 Flavor（目标 `io.geoshift.probe.target`，非目标对照 `control1/control2/control3`），独立包名、非 libxposed 模块；只在用户手动点击运行时执行。未调整 GeoShift 正常 Hook Scope 或启用 Strict。
+- **API 覆盖**：Framework `getLastKnownLocation`、`getCurrentLocation`、单次连续监听后 `removeUpdates`；Google Fused last/current；Android 33+ async Geocoder（低版本同步）；Wi-Fi 连接/缓存扫描；Telephony 网络运营商/蜂窝信息。异步调用限时，不把 null 或权限不足伪装为成功。
+- **数据最小化**：`ProbeReportCodec` 只输出接口名、摘要、状态、Android SDK/机型、受测源码提交与 UTC 时间；目标经纬度、SSID/BSSID、CellID、秘钥、原始异常不写 JSON；采用用户手动输入且不导出的共享随机 HMAC 秘钥计算粗化位置/无线指纹。目标预设坐标只用于运行时附近匹配，不写报告。
+- **报告分析**：`tools/verify_probe_reports.py` 拒绝少于 4 包×2 阶段、不同设备、不同代码提交、同一 App 两阶段权限变化、敏感字段注入与不可比状态；`PASS` 仅适用于实际可比较且三非目标控制都存在位置采样的局部结果，缺失证据为 `NOT_RUN`，明确标记用户导出的数据不可认证。
+- **单测与 CI 修改**：增加 4 Flavor JVM test tasks、四 APK Debug assemble/upload、Python unittest 报告校验；保留既有 GeoShift App JVM 测试、Macrobenchmark 编译、Debug APK。
+- **文档**：`docs/G08_OWNED_PROBE_PROTOCOL.md` 说明 8 份报告生成、脚本命令、限制及 G09 需要完成的真机矩阵。Google Fused 依赖 `com.google.android.gms:play-services-location:21.4.0`（Google 2026-06-25 发布）。
+- **本次未执行/限制**：无实际 Android 17/HyperOS 设备连接、无真实 8 报告、无实机回调或权限实测；构建成功也不等于设备行为通过；不进行真实平台账号或第三方 App 测试。
+- **下一步**：运行并审核新的 GitHub Actions，修复具体测试/编译失败；成功后仅标 G08 的**可构建 Probe 与分析器代码级 DONE**，独立实机对照仍留 G09。
