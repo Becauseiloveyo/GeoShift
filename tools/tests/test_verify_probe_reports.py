@@ -20,7 +20,7 @@ def report(role, phase, target_match=True, unchanged=True):
         "role": role, "phase": phase, "androidSdk": 37,
         "manufacturer": "owned-device", "model": "lab",
         "geoshiftSourceRevision": "a" * 40, "collectedAtUtc": "2026-10-18T00:00:00Z",
-        "redacted": True,
+        "redacted": True, "locationGrant": "FINE",
         "observations": [
             {"api": "framework", "method": "getCurrentLocation",
              "expected": expected,
@@ -75,6 +75,11 @@ class VerifyProbeReportsTest(unittest.TestCase):
 
     def test_mismatched_source_revision_rejected(self):
         self.reports[2]["geoshiftSourceRevision"] = "b" * 40
+        with self.assertRaises(ValueError):
+            compare(self.reports)
+
+    def test_permission_change_between_phases_rejected(self):
+        self.reports[3]["locationGrant"] = "COARSE"
         with self.assertRaises(ValueError):
             compare(self.reports)
 
