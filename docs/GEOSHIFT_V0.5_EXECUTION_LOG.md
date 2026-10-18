@@ -89,3 +89,15 @@
 - **验证结论**：G04 = **DONE（代码级及 CI 门槛）**。新建纯 JVM 单测已纳入 Gradle 实际执行，未从 Gradle 日志单独确认具体通过用例总数；不能臆造计数。
 - **限制和遗留设备验证**：Android 17/HyperOS 上的动态 API Hook、Geocoder callback 顺序/线程、取消/超时、系统异常回退、混合模式相同 Listener 的重复注册、非目标应用隔离仍 **NOT RUN**，归 G08/G09。同步 Geocoder 的既有模拟地址行为未改变。不承诺 100% 无泄漏或对任何平台账号限制有效。
 - **下一任务**：G05 原子 Profile 地域快照、Follow-VPN 地理数据更新及 Wi-Fi/基站的过期状态与重载不变式；必须先读本计划/日志/当前源码，补回归测试和 CI。
+
+## 2026-10-17 · Round 005 — G05 原子 Profile / 无线数据过期保护（待验证）
+- **状态**：G05 = IMPLEMENTED_UNVERIFIED；不能以 G04 的 CI 当作本次验收。
+- **根因**：既有 `GeoProfileSynchronizer` 修改 GeoIP 国家/时区/经纬度而不使旧无线身份失效；`ProfileStoreV2` 将 Profile 散存在多个 Remote Preferences 键中，缺少每份 Profile 的原子快照和过期后台写入识别。
+- **实现**：`GeoProfile` 增加 `revision`、`geoRevision`、`radioGeoRevision`、`radioStale`、`geoSource`；`GeoContextPolicy` 通过国家/地区/城市变化或 ~1 km 位置移动标记旧 Wi-Fi/基站过期；`ProfileRevisionPolicy` 比对旧版后递增提交版本；`ProfileCodec` 新增 v5 元数据。
+- **持久化**：`ProfileStoreV2` 优先读取完整 `atomic_snapshot_v5`，写入一次性 `SharedPreferences.Editor.commit()`；继续携带兼容旧键，损坏的权威快照不回退混合键；旧 Follow-VPN 无线数据的来源无法核实时标记 stale，但保留可恢复字段。当前未做真实 LSPosed Remote Preferences commit 测试。
+- **运行态**：`GeoShiftModule` Wi-Fi/Telephony Hook 和 `effectiveWifiAccessPoints` 检查无线地理绑定状态；过期时不再声称模拟数据有效。**旧无线数据被停用时，系统原始无线信息可能透传**，不能称为防止系统值泄露。
+- **产品操作**：ProfileEditorScreen 显示过期告警与显式确认入口；无线提供者仅将实际成功获取的类别标记可用，缺失类别的旧数据不会混入新城市 Profile；MainActivity 保存后重新读取带提交版本的新 Profile，后台旧数据写入失败。
+- **测试**：新增 `GeoContextPolicyTest`、`ProfileRevisionPolicyTest`，扩充 `GeoProfileSynchronizerTest`，覆盖跨国/跨区/移动、同城小抖动、无线绑定手动恢复、GeoIP 失败不落库、旧 Revision 冲突拒绝。
+- **使用限制**：VPN/代理加密、Account eligibility、Root/Integrity/Anti-cheat 规避均不实现。所有真实 Android 17 / HyperOS Hook 与 Remote Preferences 原子通知验证仍为 **NOT RUN**，留 G08/G09。
+- **详细说明**：`docs/G05_ATOMIC_PROFILE_AND_RADIO_STALENESS.md`。
+- **待执行**：记录本提交 CI Run 与失败/通过证据；成功方可把 G05 标记为 DONE（代码级），下一任务 G06。
