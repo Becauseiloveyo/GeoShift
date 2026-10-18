@@ -332,7 +332,7 @@ class MainActivity : ComponentActivity() {
                 }
             } catch (error: Throwable) {
                 runOnUiThread {
-                    syncStatus = getString(R.string.sync_failed, error.message ?: error.javaClass.simpleName)
+                    syncStatus = getString(R.string.sync_failed, "Request failed; inspect connectivity and configuration")
                     showNotice(syncStatus)
                 }
             } finally {
@@ -371,7 +371,7 @@ class MainActivity : ComponentActivity() {
                 }
             } catch (error: Throwable) {
                 runOnUiThread {
-                    syncStatus = getString(R.string.sync_failed, error.message ?: error.javaClass.simpleName)
+                    syncStatus = getString(R.string.sync_failed, "Request failed; inspect connectivity and configuration")
                     showNotice(syncStatus)
                 }
             } finally {
@@ -545,7 +545,7 @@ class MainActivity : ComponentActivity() {
                 }
             } catch (error: Throwable) {
                 runOnUiThread {
-                    radioStatus = getString(R.string.provider_query_failed, error.message ?: error.javaClass.simpleName)
+                    radioStatus = getString(R.string.provider_query_failed, "Provider request failed; check credentials or network")
                     if (apply) showNotice(radioStatus)
                 }
             } finally {
