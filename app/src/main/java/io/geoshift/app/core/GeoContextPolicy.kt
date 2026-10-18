@@ -36,7 +36,8 @@ object GeoContextPolicy {
         if (!materiallyChanged(base, updated)) return updated.copy(
             geoRevision = base.geoRevision,
         )
-        val next = if (base.geoRevision == Long.MAX_VALUE) 1L else base.geoRevision + 1L
+        check(base.geoRevision < Long.MAX_VALUE) { "Geography revision exhausted" }
+        val next = base.geoRevision + 1L
         return updated.copy(
             geoRevision = next,
             radioGeoRevision = base.radioGeoRevision,
