@@ -18,10 +18,10 @@ object ProfileHealth {
             profile.latitude.isFinite() && profile.latitude in -90.0..90.0 &&
             profile.longitude.isFinite() && profile.longitude in -180.0..180.0
         val wifiReady = !profile.wifiEnabled || accessPoints.isNotEmpty()
-        val detailedCell = profile.telephonyEnabled && profile.cellRadio.isNotBlank() &&
+        val detailedCell = profile.telephonyEnabled && profile.isRadioCurrent() && profile.cellRadio.isNotBlank() &&
             profile.cellAreaCode >= 0L && profile.cellId >= 0L
         val cellularReady = !profile.telephonyEnabled ||
-            (profile.mcc.isNotBlank() && profile.mnc.isNotBlank())
+            (profile.isRadioCurrent() && profile.mcc.isNotBlank() && profile.mnc.isNotBlank())
 
         var score = 100
         issues.forEach { issue ->
