@@ -157,6 +157,16 @@ class G09DeviceGateTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.verified_review()
 
+    def test_different_continuity_permission_is_rejected(self):
+        self.continuity[2]["locationGrant"] = "COARSE"
+        with self.assertRaises(ValueError):
+            self.verified_review()
+
+    def test_different_continuity_model_is_rejected(self):
+        self.continuity[2]["model"] = "not-the-same-device"
+        with self.assertRaises(ValueError):
+            self.verified_review()
+
     def test_timestamp_without_timezone_rejected(self):
         self.matrix["continuous30"]["startUtc"] = "2026-10-18T01:00:00"
         with self.assertRaises(ValueError):
