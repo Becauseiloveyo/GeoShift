@@ -29,6 +29,8 @@ jobs:
           gradle-version: "9.5.1"
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
+      - name: Run standalone Probe unit tests
+        run: gradle :probe:testTargetDebugUnitTest :probe:testControl1DebugUnitTest :probe:testControl2DebugUnitTest :probe:testControl3DebugUnitTest --stacktrace
       - name: Compile Macrobenchmark suite
         run: gradle :app:assembleBenchmark :benchmark:assembleBenchmark --stacktrace
       - name: Build debug APK and independent Probe variants
