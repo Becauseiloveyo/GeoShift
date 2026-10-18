@@ -35,8 +35,6 @@ object GeoContextPolicy {
     fun changedLocation(base: GeoProfile, updated: GeoProfile): GeoProfile {
         if (!materiallyChanged(base, updated)) return updated.copy(
             geoRevision = base.geoRevision,
-            radioGeoRevision = base.radioGeoRevision,
-            radioStale = base.radioStale,
         )
         val next = if (base.geoRevision == Long.MAX_VALUE) 1L else base.geoRevision + 1L
         return updated.copy(
