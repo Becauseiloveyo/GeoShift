@@ -185,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
             args.output.write_text(rendered, encoding="utf-8")
         else:
             print(rendered, end="")
-        return 1 if result["overall"] == "FAIL" else 0
+        return 1 if result["overall"] == "FAIL" else 3 if result["overall"] == "NOT_RUN" else 0
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f"INVALID_PROBE_EVIDENCE: {type(error).__name__}", file=sys.stderr)
         return 2
