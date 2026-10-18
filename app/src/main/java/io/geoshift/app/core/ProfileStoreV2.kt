@@ -106,14 +106,8 @@ object ProfileStoreV2 {
         if (profile.targetPackage.isBlank() || profile.validate().isNotEmpty()) return false
         val packageName = profile.targetPackage
         val prior = load(prefs, packageName)
-        // Reject background requests started against an older profile. Do not overwrite
-        // a manual edit, a newer geo result, or a new radio binding.
-        if (prior != null && profile.revision != prior.revision) return false
-        val changed = prior?.let { GeoContextPolicy.changedLocation(it, profile) } ?: profile
-        val nextRevision = (prior?.revision ?: 0L) + 1L
-        if (nextRevision <= 0L) return false
-        val committed = changed.copy(revision = nextRevision)
-        if (committed.validate().isNotEmpty()) return false
+        // One immutable complete snapshot per commit, with optimistic revision guard.
+        val committed = ProfileRevisionPolicy.next(prior, profile) ?: return false
         val editor = prefs.edit() ?: return false
         val packages = (packageNames(prefs) + packageName).distinct().sorted()
         val editorResult = editor
