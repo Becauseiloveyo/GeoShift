@@ -22,7 +22,7 @@ import subprocess
 import sys
 from typing import Callable
 
-from verify_probe_reports import compare
+from verify_probe_reports import compare, parse_report
 
 ROLES = ("target", "control1", "control2", "control3")
 PACKAGES = ("io.geoshift.app",) + tuple("io.geoshift.probe." + x for x in ROLES)
@@ -183,7 +183,35 @@ def duration_seconds(start: str, end: str) -> float:
     return (parse(end) - parse(start)).total_seconds()
 
 
-def review(preflight_doc: dict, manual: dict, reports: list[dict]) -> dict:
+def validate_continuity(reports: list[dict], session: str, revision: str,
+                        sdk: int) -> dict:
+    """Require six independently exported target-active measurements over 30 minutes."""
+    if len(reports) < 6 or len(reports) > 64:
+        return {"status": "NOT_RUN", "samples": len(reports), "durationSeconds": 0}
+    observed = []
+    for raw in reports:
+        doc = parse_report(raw)
+        ensure(doc["role"] == "target" and doc["phase"] == "active",
+               "Only target active reports allowed in continuity series")
+        ensure(doc["session"] == session and doc["geoshiftSourceRevision"] == revision and
+               doc["androidSdk"] == sdk, "Continuity identity drift")
+        timestamps = datetime.fromisoformat(doc["collectedAtUtc"].replace("Z", "+00:00"))
+        observed.append(timestamps)
+        matched = any(
+            row["api"] in {"framework", "fused"} and row["actual"] == "MATCH_TARGET"
+            for row in doc["observations"]
+        )
+        if not matched:
+            return {"status": "FAIL", "samples": len(reports),
+                    "durationSeconds": 0}
+    ensure(len(set(observed)) == len(observed), "Repeated continuity timestamps")
+    seconds = (max(observed) - min(observed)).total_seconds()
+    return {"status": "MEASURED" if seconds >= 1800 else "NOT_RUN",
+            "samples": len(observed), "durationSeconds": int(seconds)}
+
+
+def review(preflight_doc: dict, manual: dict, reports: list[dict],
+           continuity_reports: list[dict] | None = None) -> dict:
     """Honest output never upgrades user-asserted evidence to device attestation."""
     ensure(preflight_doc.get("schemaVersion") == 1, "Invalid preflight")
     ensure(manual.get("schemaVersion") == 1, "Invalid matrix schema")
@@ -205,15 +233,25 @@ def review(preflight_doc: dict, manual: dict, reports: list[dict]) -> dict:
         ensure(continuous_valid, "Cannot claim 30min PASS from insufficient samples")
 
     comparison = compare(reports)
+    continuity = validate_continuity(
+        continuity_reports or [], comparison["session"],
+        comparison["geoshiftSourceRevision"], preflight_doc.get("androidSdk", -1),
+    )
+    if checks["continuous_location_30min"] == "PASS":
+        ensure(continuity["status"] == "MEASURED",
+               "30-minute PASS requires six separate active Probe reports covering 30+ minutes")
     if checks["three_non_target_controls"] == "PASS":
         ensure(comparison["overall"] == "PASS", "Control PASS needs compatible eight-report result")
     if checks["target_framework_and_fused"] == "PASS":
         target_checks = [x for x in comparison["checks"] if x["role"] == "target"]
         ensure(any(x["status"] == "PASS" for x in target_checks),
                "Target PASS needs an observed target location match")
-    if preflight_doc.get("status") != "READY_FOR_MANUAL_VALIDATION":
+    if preflight_doc.get("androidSdk") != reports[0].get("androidSdk"):
         outcome = "BLOCKED"
-    elif "FAIL" in checks.values() or comparison["overall"] == "FAIL":
+    elif preflight_doc.get("status") != "READY_FOR_MANUAL_VALIDATION":
+        outcome = "BLOCKED"
+    elif "FAIL" in checks.values() or comparison["overall"] == "FAIL" or
+        continuity["status"] == "FAIL":
         outcome = "FAIL_REPORTED"
     elif comparison["overall"] != "PASS" or "NOT_RUN" in checks.values():
         outcome = "NOT_RUN"
@@ -225,8 +263,12 @@ def review(preflight_doc: dict, manual: dict, reports: list[dict]) -> dict:
         "androidSdk": preflight_doc.get("androidSdk"),
         "probeOverall": comparison["overall"],
         "caseCounts": {name: list(checks.values()).count(name) for name in ("PASS", "FAIL", "NOT_RUN")},
-        "continuityEvidence": {"observedSeconds": int(observed), "samples": count,
-                               "meetsMinimum": continuous_valid},
+        "continuityEvidence": {
+            "userReportedSeconds": int(observed), "userReportedSamples": count,
+            "exportedSamples": continuity["samples"],
+            "exportedDurationSeconds": continuity["durationSeconds"],
+            "status": continuity["status"],
+        },
         "warning": "User-reported outcomes and exported JSON are not hardware-attested. "
                    "Do not mark G09 DONE without independent phone-side inspection, "
                    "LSPosed scope review, APK signing checks and reproducible logs.",
@@ -250,6 +292,7 @@ def main(argv: list[str] | None = None) -> int:
     gate.add_argument("--preflight", type=Path, required=True)
     gate.add_argument("--matrix", type=Path, required=True)
     gate.add_argument("--reports", type=Path, nargs=8, required=True)
+    gate.add_argument("--continuity-reports", type=Path, nargs="*", default=[])
     gate.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
@@ -265,7 +308,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if result["status"] == "READY_FOR_MANUAL_VALIDATION" else 3
         else:
             docs = [load_json(p) for p in args.reports]
-            result = review(load_json(args.preflight), load_json(args.matrix), docs)
+            continuity_docs = [load_json(p) for p in args.continuity_reports]
+            result = review(load_json(args.preflight), load_json(args.matrix),
+                            docs, continuity_docs)
             write_json(args.output, result)
             return 0 if result["deviceGate"] == "USER_REPORTED_COMPLETE_REQUIRES_INDEPENDENT_REVIEW" else 3
         return 0
