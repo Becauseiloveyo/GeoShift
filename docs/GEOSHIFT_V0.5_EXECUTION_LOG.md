@@ -140,3 +140,12 @@
 - **测试**：`ProviderCredentialEngineTest.kt` 用受控伪加密/伪持久化验证迁移成功失败、密文损坏、失效恢复及明文清除；`ProfileExportPolicyTest.kt` 验证敏感元数据默认移除且不修改原配置。**AndroidKeystore 真实硬件加解密、迁移、备份恢复和系统异常 NOT RUN**，归 G09。
 - **文档**：`docs/G07_KEYSTORE_AND_EXPORT_SECURITY.md` 说明威胁模型、不可逆恢复、用户导出风险及实机矩阵。
 - **后续检查**：以新分支提交的 JVM tests、Macrobenchmark 编译、Debug APK build/upload 全部成功为代码级门槛。若失败先记录错误并修复，再重试；成功才标 G07=DONE，下一任务 G08 Probe。
+
+### Round 007 验收补录 — G07 CI PASS
+- **最终受测提交**：`b3ba07352d194d03f07eb35ee3afb8fd5aaeaec9`，包含 G07 密码学适配、纯 JVM 迁移协议与单测、Provider UI 错误恢复、安全默认导出和文档。
+- **完整流水线**：[GitHub Actions #39096242722](https://github.com/Becauseiloveyo/GeoShift/actions/runs/39096242722)，job `117583182882`，`completed / success`。
+- **实际通过**：`gradle :app:testDebugUnitTest --stacktrace` → BUILD SUCCESSFUL in 1m41s；`gradle :app:assembleBenchmark :benchmark:assembleBenchmark --stacktrace` → BUILD SUCCESSFUL in 1m51s（仅编译 benchmark）；`gradle :app:assembleDebug --stacktrace` → BUILD SUCCESSFUL in 31s；Upload debug APK → success。
+- **Artifact**：`GeoShift-debug-b3ba07352d194d03f07eb35ee3afb8fd5aaeaec9`，ID `12125106153`，GitHub artifact 归档大小 `10,648,406 bytes`。此为 CI 产物，不是设备安装或硬件加密测量。
+- **任务结果**：**G07 = DONE（代码级、完整 CI 门槛）**；自动化只测试 JVM 模型/迁移与导出策略，未宣称加密密钥在真实 Android 17/HyperOS 中已存取成功或硬件支持等级。
+- **重要隐私边界**：默认 Profile Export 去除公共出口 IP 与无线/蜂窝身份，但保留用户配置的模拟目的地坐标，仍须审慎分享；`ProfileCodec` 的应用内部 v5 快照不做破坏性脱敏。升级前残留在物理存储块/外部备份的旧明文无法通过 SharedPreferences `remove` 保证彻底擦除。设备和 Keystore 恢复验证 **NOT RUN**，归 G09。
+- **下一任务**：G08 实现可独立安装/卸载的自有 Probe 测试应用，并记录 API 调用期望、实际状态、非目标对照、脱敏结构化报告及验证来源；不得在真实第三方账号上做实验。
