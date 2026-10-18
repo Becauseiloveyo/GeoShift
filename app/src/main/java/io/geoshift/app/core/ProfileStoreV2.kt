@@ -184,6 +184,9 @@ object ProfileStoreV2 {
         if (packageNames(prefs).isNotEmpty()) return
         val legacyTarget = prefs.getString(ProfileStore.KEY_TARGET_PACKAGE, "").orEmpty()
         if (legacyTarget.isBlank()) return
-        save(prefs, ProfileStore.load(prefs))
+        val legacy = ProfileStore.load(prefs)
+        save(prefs, legacy.copy(
+            radioStale = legacy.followVpn && (legacy.wifiEnabled || legacy.telephonyEnabled),
+        ))
     }
 }
