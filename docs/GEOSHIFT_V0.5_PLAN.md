@@ -2,7 +2,7 @@
 
 > **唯一执行依据 / Single Source of Truth**
 >
-> 状态：**IN PROGRESS — G06 IMPLEMENTED_UNVERIFIED; CI PENDING**  
+> 状态：**IN PROGRESS — G00-G06 COMPLETE; G07 NEXT**  
 > 计划版本：1.0.0；建立日期：2026-10-17  
 > 仓库：`Becauseiloveyo/GeoShift`；开发分支：`feat/v0.5-privacy-reliability`  
 > 基线分支：`feat/v0.1-foundation`；基线提交：`31b14b46923c9f710936b4298e00231781c263f7`（2026-09-07）  
@@ -51,7 +51,7 @@
 | G03 | P0 | Hook 可观测性与身份隔离 | 异步脱敏审计、诊断日志导入及状态 UI、共享 UID/多用户歧义拒绝单测；完整 CI #39038730416 通过，真机留 G08/G09 | DONE |
 | G04 | P0 | 定位 API 语义和回调稳定性 | null/空列表保真、取消与监听器注册/注销、API 33+ 异步 Geocoder；首次 CI 编译失败已修复，最终 CI #39050614646 全部成功；真机归 G08/G09 | DONE |
 | G05 | P1 | 原子地理 Profile、无线数据有效期 | v5 原子快照、Revision CAS、旧无线身份过期/停用与手动重新绑定；最终 CI #39092267241 全部成功，LSPosed 实机归 G08/G09 | DONE |
-| G06 | P1 | 原生隐私权限引导和诊断 UI | 原生授权只读快照、系统应用设置跳转、配置/Hook 日志/Probe 证据独立展示，JVM 测试已提交，等待 CI；实机留 G08/G09 | IMPLEMENTED_UNVERIFIED |
+| G06 | P1 | 原生隐私权限引导和诊断 UI | 原生授权只读快照、系统设置跳转、配置/Hook 日志/Probe 证据分离；最终 CI #39093873195 全部成功，设备操作留 G08/G09 | DONE |
 | G07 | P1 | 本地密钥、日志和导出卫生 | 原生 Android Keystore 保护 provider API key；迁移与异常测试；日志和 Profile JSON 不输出凭据/真实坐标 | TODO |
 | G08 | P1 | 独立自控 Probe 与对照测试 | 编写受控测试 app/automated tests，覆盖 Framework、Fused、Geocoder、Wi-Fi、Telephony；非目标应用对照；输出机器可读结果 | TODO |
 | G09 | P1 | Android 17 / HyperOS 实机闭环 | 冷启动、前后台、位置变化、VPN GeoIP 同步、重启/停止、拒绝权限等实机矩阵；无 P0 遗留 | TODO |
