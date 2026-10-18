@@ -121,6 +121,8 @@ class ProbeEngine(private val context: Context, private val config: ProbeConfig)
     }
 
     private fun frameworkCurrent() = guarded("framework", "getCurrentLocation") {
+        if (Build.VERSION.SDK_INT < 30)
+            return@guarded sample("framework", "getCurrentLocation", ProbeActual.UNSUPPORTED)
         if (!hasLocationPermission()) return@guarded sample("framework", "getCurrentLocation", ProbeActual.DENIED)
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val provider = selectedProvider(manager)
