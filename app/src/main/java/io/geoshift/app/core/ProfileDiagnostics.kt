@@ -27,6 +27,10 @@ object ProfileDiagnostics {
             add(Issue(Severity.WARNING, "Geocoder override is enabled while location override is disabled"))
         }
 
+        if ((profile.wifiEnabled || profile.telephonyEnabled) && !profile.isRadioCurrent()) {
+            add(Issue(Severity.WARNING, "Radio identity is stale after a location change; reconfirm manually or refresh from provider"))
+        }
+
         if (profile.wifiEnabled && profile.effectiveWifiAccessPoints().isEmpty()) {
             add(Issue(Severity.WARNING, "Wi-Fi override is enabled but no SSID/BSSID is configured"))
         }
