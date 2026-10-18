@@ -101,3 +101,12 @@
 - **使用限制**：VPN/代理加密、Account eligibility、Root/Integrity/Anti-cheat 规避均不实现。所有真实 Android 17 / HyperOS Hook 与 Remote Preferences 原子通知验证仍为 **NOT RUN**，留 G08/G09。
 - **详细说明**：`docs/G05_ATOMIC_PROFILE_AND_RADIO_STALENESS.md`。
 - **待执行**：记录本提交 CI Run 与失败/通过证据；成功方可把 G05 标记为 DONE（代码级），下一任务 G06。
+
+### Round 005 G05 最终验收 · CI PASS
+- **最终受测提交**：`4f832a63bea6ca5ae5148a0c5508194a9778970a`（包含 G05 运行时代码、单测、说明文档以及实施阶段日志）。
+- **实际 CI**：[GitHub Actions #39092267241](https://github.com/Becauseiloveyo/GeoShift/actions/runs/39092267241)；job `117571325037`，`completed / success`。
+- **真实通过步骤**：`gradle :app:testDebugUnitTest --stacktrace` → BUILD SUCCESSFUL in 1m57s；`gradle :app:assembleBenchmark :benchmark:assembleBenchmark --stacktrace` → BUILD SUCCESSFUL in 1m48s（编译而非实测性能）；`gradle :app:assembleDebug --stacktrace` → BUILD SUCCESSFUL in 28s；Upload debug APK = success。日志未提供明确单测用例总数，不做推断。
+- **构建产物**：`GeoShift-debug-4f832a63bea6ca5ae5148a0c5508194a9778970a`，GitHub Actions artifact ID `12122944270`，归档大小 `10,624,371 bytes`；不能误称 APK 内部大小或真机安装证据。
+- **最终状态**：G05 = **DONE（代码级 CI 门槛）**；Profile CAS / 过期策略的纯 JVM 测试实际成功。LSPosed Remote Preferences `commit/readback`、断电恢复、v1–v5 真实迁移、无线 Hook 的实际交付、非目标应用隔离与 Android 17/HyperOS 稳定性均 **NOT RUN**，列入 G08/G09。
+- **重要限制**：标记旧无线数据 stale 并停用模拟只使旧数据不再被当作当前城市数据，**系统原始无线信息仍可能透传**，不构成真实信息零泄漏保证。用户如需阻止相关 API 访问，应优先使用 Android 原生权限。
+- **下一任务**：G06 原生位置权限引导与诊断 UI 区分；先读本计划/本日志/最新代码，随后实现测试再通过新一轮 CI。
