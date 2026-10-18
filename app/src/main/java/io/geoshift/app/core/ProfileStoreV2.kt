@@ -11,6 +11,8 @@ object ProfileStoreV2 {
     const val REMOTE_PREFS = ProfileStore.REMOTE_PREFS
 
     private const val KEY_PROFILE_INDEX = "v2_profile_index"
+    /** One authoritative per-profile payload: readers cannot observe mixed geo/radio fields. */
+    private const val KEY_ATOMIC_SNAPSHOT = "atomic_snapshot_v5"
     private const val PREFIX = "profile::"
     private const val SEPARATOR = "|"
 
@@ -37,6 +39,14 @@ object ProfileStoreV2 {
 
     fun load(prefs: SharedPreferences, packageName: String): GeoProfile? {
         if (packageName.isBlank()) return null
+        val atomic = prefs.getString(key(packageName, KEY_ATOMIC_SNAPSHOT), null)
+        if (atomic != null) {
+            // A corrupt authoritative payload must not silently fall back to potentially
+            // mixed legacy keys, which could expose a stale radio profile.
+            return runCatching { ProfileCodec.decode(atomic) }
+                .getOrNull()
+                ?.takeIf { it.targetPackage == packageName && it.validate().isEmpty() }
+        }
         val storedTarget = prefs.getString(key(packageName, ProfileStore.KEY_TARGET_PACKAGE), null)
         if (storedTarget == null) {
             val legacyTarget = prefs.getString(ProfileStore.KEY_TARGET_PACKAGE, "").orEmpty()
@@ -84,47 +94,58 @@ object ProfileStoreV2 {
         return save(prefs, profile)
     }
 
+    @Synchronized
     fun save(prefs: SharedPreferences, profile: GeoProfile): Boolean {
-        if (profile.targetPackage.isBlank()) return false
+        if (profile.targetPackage.isBlank() || profile.validate().isNotEmpty()) return false
         val packageName = profile.targetPackage
+        val prior = load(prefs, packageName)
+        // Reject background requests started against an older profile. Do not overwrite
+        // a manual edit, a newer geo result, or a new radio binding.
+        if (prior != null && profile.revision != prior.revision) return false
+        val changed = prior?.let { GeoContextPolicy.changedLocation(it, profile) } ?: profile
+        val nextRevision = (prior?.revision ?: 0L) + 1L
+        if (nextRevision <= 0L) return false
+        val committed = changed.copy(revision = nextRevision)
+        if (committed.validate().isNotEmpty()) return false
         val editor = prefs.edit() ?: return false
         val packages = (packageNames(prefs) + packageName).distinct().sorted()
-        editor
+        val editorResult = editor
+            .putString(key(packageName, KEY_ATOMIC_SNAPSHOT), ProfileCodec.encode(committed))
             .putString(KEY_PROFILE_INDEX, packages.joinToString(SEPARATOR))
-            .putBoolean(key(packageName, ProfileStore.KEY_ENABLED), profile.enabled)
+            .putBoolean(key(packageName, ProfileStore.KEY_ENABLED), committed.enabled)
             .putString(key(packageName, ProfileStore.KEY_TARGET_PACKAGE), packageName)
-            .putBoolean(key(packageName, ProfileStore.KEY_FOLLOW_VPN), profile.followVpn)
-            .putBoolean(key(packageName, ProfileStore.KEY_TIMEZONE_ENABLED), profile.timezoneEnabled)
-            .putString(key(packageName, ProfileStore.KEY_TIMEZONE), profile.timezoneId)
-            .putBoolean(key(packageName, ProfileStore.KEY_LOCALE_ENABLED), profile.localeEnabled)
-            .putString(key(packageName, ProfileStore.KEY_LOCALE), profile.localeTag)
-            .putString(key(packageName, ProfileStore.KEY_COUNTRY), profile.countryCode.uppercase())
-            .putBoolean(key(packageName, ProfileStore.KEY_LOCATION_ENABLED), profile.locationEnabled)
-            .putString(key(packageName, ProfileStore.KEY_LATITUDE), profile.latitude.toString())
-            .putString(key(packageName, ProfileStore.KEY_LONGITUDE), profile.longitude.toString())
-            .putBoolean(key(packageName, ProfileStore.KEY_GEOCODER_ENABLED), profile.geocoderEnabled)
-            .putBoolean(key(packageName, ProfileStore.KEY_WIFI_ENABLED), profile.wifiEnabled)
-            .putString(key(packageName, ProfileStore.KEY_WIFI_SSID), profile.wifiSsid)
-            .putString(key(packageName, ProfileStore.KEY_WIFI_BSSID), profile.wifiBssid.lowercase())
-            .putInt(key(packageName, ProfileStore.KEY_WIFI_RSSI), profile.wifiRssiDbm)
+            .putBoolean(key(packageName, ProfileStore.KEY_FOLLOW_VPN), committed.followVpn)
+            .putBoolean(key(packageName, ProfileStore.KEY_TIMEZONE_ENABLED), committed.timezoneEnabled)
+            .putString(key(packageName, ProfileStore.KEY_TIMEZONE), committed.timezoneId)
+            .putBoolean(key(packageName, ProfileStore.KEY_LOCALE_ENABLED), committed.localeEnabled)
+            .putString(key(packageName, ProfileStore.KEY_LOCALE), committed.localeTag)
+            .putString(key(packageName, ProfileStore.KEY_COUNTRY), committed.countryCode.uppercase())
+            .putBoolean(key(packageName, ProfileStore.KEY_LOCATION_ENABLED), committed.locationEnabled)
+            .putString(key(packageName, ProfileStore.KEY_LATITUDE), committed.latitude.toString())
+            .putString(key(packageName, ProfileStore.KEY_LONGITUDE), committed.longitude.toString())
+            .putBoolean(key(packageName, ProfileStore.KEY_GEOCODER_ENABLED), committed.geocoderEnabled)
+            .putBoolean(key(packageName, ProfileStore.KEY_WIFI_ENABLED), committed.wifiEnabled)
+            .putString(key(packageName, ProfileStore.KEY_WIFI_SSID), committed.wifiSsid)
+            .putString(key(packageName, ProfileStore.KEY_WIFI_BSSID), committed.wifiBssid.lowercase())
+            .putInt(key(packageName, ProfileStore.KEY_WIFI_RSSI), committed.wifiRssiDbm)
             .putString(
                 key(packageName, ProfileStore.KEY_WIFI_ACCESS_POINTS),
-                WifiAccessPointCodec.encode(profile.wifiAccessPoints)
+                WifiAccessPointCodec.encode(committed.wifiAccessPoints)
             )
-            .putBoolean(key(packageName, ProfileStore.KEY_TELEPHONY_ENABLED), profile.telephonyEnabled)
-            .putString(key(packageName, ProfileStore.KEY_MCC), profile.mcc)
-            .putString(key(packageName, ProfileStore.KEY_MNC), profile.mnc)
-            .putString(key(packageName, ProfileStore.KEY_OPERATOR_NAME), profile.operatorName)
-            .putString(key(packageName, ProfileStore.KEY_CELL_RADIO), profile.cellRadio)
-            .putLong(key(packageName, ProfileStore.KEY_CELL_AREA_CODE), profile.cellAreaCode)
-            .putLong(key(packageName, ProfileStore.KEY_CELL_ID), profile.cellId)
-            .putString(key(packageName, ProfileStore.KEY_RADIO_SOURCE), profile.radioSource)
-            .putString(key(packageName, ProfileStore.KEY_LAST_SYNC_IP), profile.lastSyncIp)
-            .putString(key(packageName, ProfileStore.KEY_LAST_SYNC_CITY), profile.lastSyncCity)
-            .putString(key(packageName, ProfileStore.KEY_LAST_SYNC_REGION), profile.lastSyncRegion)
-            .putLong(key(packageName, ProfileStore.KEY_LAST_SYNC_AT), profile.lastSyncAtEpochMs)
-            .apply()
-        return true
+            .putBoolean(key(packageName, ProfileStore.KEY_TELEPHONY_ENABLED), committed.telephonyEnabled)
+            .putString(key(packageName, ProfileStore.KEY_MCC), committed.mcc)
+            .putString(key(packageName, ProfileStore.KEY_MNC), committed.mnc)
+            .putString(key(packageName, ProfileStore.KEY_OPERATOR_NAME), committed.operatorName)
+            .putString(key(packageName, ProfileStore.KEY_CELL_RADIO), committed.cellRadio)
+            .putLong(key(packageName, ProfileStore.KEY_CELL_AREA_CODE), committed.cellAreaCode)
+            .putLong(key(packageName, ProfileStore.KEY_CELL_ID), committed.cellId)
+            .putString(key(packageName, ProfileStore.KEY_RADIO_SOURCE), committed.radioSource)
+            .putString(key(packageName, ProfileStore.KEY_LAST_SYNC_IP), committed.lastSyncIp)
+            .putString(key(packageName, ProfileStore.KEY_LAST_SYNC_CITY), committed.lastSyncCity)
+            .putString(key(packageName, ProfileStore.KEY_LAST_SYNC_REGION), committed.lastSyncRegion)
+            .putLong(key(packageName, ProfileStore.KEY_LAST_SYNC_AT), committed.lastSyncAtEpochMs)
+            .commit()
+        return editorResult
     }
 
     fun delete(service: XposedService, packageName: String): Boolean {
@@ -144,11 +165,11 @@ object ProfileStoreV2 {
             ProfileStore.KEY_CELL_ID, ProfileStore.KEY_RADIO_SOURCE,
             ProfileStore.KEY_LAST_SYNC_IP, ProfileStore.KEY_LAST_SYNC_CITY,
             ProfileStore.KEY_LAST_SYNC_REGION, ProfileStore.KEY_LAST_SYNC_AT,
+            KEY_ATOMIC_SNAPSHOT,
         )
         keys.forEach { editor.remove(key(packageName, it)) }
         val packages = packageNames(prefs).filterNot { it == packageName }
-        editor.putString(KEY_PROFILE_INDEX, packages.joinToString(SEPARATOR)).apply()
-        return true
+        return editor.putString(KEY_PROFILE_INDEX, packages.joinToString(SEPARATOR)).commit()
     }
 
     private fun packageNames(prefs: SharedPreferences): List<String> =
