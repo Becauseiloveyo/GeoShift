@@ -2,6 +2,8 @@ package io.geoshift.app
 
 import android.Manifest
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.os.Build
@@ -18,6 +20,8 @@ import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.confirmRadioForCurrentGeography
 import io.geoshift.app.core.HookAudit
 import io.geoshift.app.core.HookAuditEvent
+import io.geoshift.app.core.AndroidLocationPermissionReader
+import io.geoshift.app.core.NativeLocationAccess
 import io.geoshift.app.core.ProfileCodec
 import io.geoshift.app.core.ProfileStoreV2
 import io.geoshift.app.core.ProviderSettings
@@ -54,6 +58,7 @@ class MainActivity : ComponentActivity() {
     private var radioStatus by mutableStateOf("")
     private var auditEvents by mutableStateOf<List<HookAuditEvent>>(emptyList())
     private var auditLogStatus by mutableStateOf("No diagnostic evidence imported")
+    private var nativePermissions by mutableStateOf<Map<String, NativeLocationAccess>>(emptyMap())
     private var notice by mutableStateOf<String?>(null)
     private var syncInFlight by mutableStateOf(false)
     private var radioQueryInFlight by mutableStateOf(false)
@@ -172,6 +177,7 @@ class MainActivity : ComponentActivity() {
                         notice = notice,
                         auditEvents = auditEvents,
                         auditLogStatus = auditLogStatus,
+                        nativePermissions = nativePermissions,
                         isSyncing = syncInFlight,
                         isRadioBusy = radioQueryInFlight,
                         editingProfile = editingProfile,
@@ -192,6 +198,7 @@ class MainActivity : ComponentActivity() {
                         exportProfile = ::exportProfile,
                         importProfile = { importLauncher.launch(arrayOf("application/json", "text/json")) },
                         importAudit = { auditLauncher.launch(arrayOf("text/plain", "text/*", "application/octet-stream")) },
+                        openNativePermissions = ::openNativePermissions,
                         saveProviders = ::saveProviderSettings,
                         previewRadio = ::previewRadioEnvironment,
                         applyRadioSuggestion = ::applyRadioSuggestion,
@@ -200,6 +207,11 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshNativePermissions()
     }
 
     override fun onStart() {
@@ -219,11 +231,34 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshProfiles(service: XposedService) {
         profiles = ProfileStoreV2.list(service)
+        refreshNativePermissions()
         val latest = profiles.maxByOrNull { it.lastSyncAtEpochMs }
         if (!syncInFlight && latest?.lastSyncIp?.isNotBlank() == true) {
             syncStatus = formatLastSync(latest)
         }
         updateFollowService(requestPermission = false)
+    }
+
+    private fun refreshNativePermissions() {
+        nativePermissions = profiles
+            .map { it.targetPackage }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .associateWith { AndroidLocationPermissionReader.inspect(this, it) }
+    }
+
+    private fun openNativePermissions(targetPackage: String) {
+        if (targetPackage.isBlank() || targetPackage !in profiles.map { it.targetPackage }) {
+            showNotice("Select a saved target profile before opening Android settings")
+            return
+        }
+        runCatching {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$targetPackage")
+            })
+        }.onFailure {
+            showNotice("Unable to open app settings; use Android Settings > Apps manually")
+        }
     }
 
     private fun openNewProfile() {
