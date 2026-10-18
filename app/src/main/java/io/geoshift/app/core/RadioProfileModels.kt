@@ -71,7 +71,7 @@ object WifiAccessPointCodec {
 }
 
 fun GeoProfile.effectiveWifiAccessPoints(): List<WifiAccessPointProfile> {
-    if (!wifiEnabled) return emptyList()
+    if (!wifiEnabled || !isRadioCurrent()) return emptyList()
     val primary = if (wifiBssid.isNotBlank()) {
         WifiAccessPointProfile(
             ssid = wifiSsid,
