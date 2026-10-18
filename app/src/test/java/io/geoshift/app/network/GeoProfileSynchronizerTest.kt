@@ -37,6 +37,34 @@ class GeoProfileSynchronizerTest {
     }
 
     @Test
+    fun newCountryMakesOldRadioStaleWithoutDeletingValues() {
+        val base = GeoProfile(
+            targetPackage = "com.example.one", countryCode = "JP",
+            latitude = 35.6762, longitude = 139.6503, geoRevision = 4L,
+            radioGeoRevision = 4L, wifiEnabled = true,
+            wifiSsid = "old-lab", wifiBssid = "02:11:22:33:44:55",
+            telephonyEnabled = true, mcc = "440", mnc = "10",
+        )
+        val result = GeoProfileSynchronizer().synchronize(base, losAngeles, 1234L).profile
+        assertEquals(5L, result.geoRevision)
+        assertEquals(4L, result.radioGeoRevision)
+        assertEquals(true, result.radioStale)
+        assertEquals("old-lab", result.wifiSsid)
+        assertEquals("440", result.mcc)
+        assertEquals("geoip", result.geoSource)
+    }
+
+    @Test
+    fun lookupFailureLeavesPreviousSnapshotUntouched() {
+        val original = GeoProfile(targetPackage = "com.example.one", revision = 7L)
+        val failed = GeoProfileSynchronizer(GeoIpProvider { error("upstream down") })
+        val outcome = runCatching { failed.synchronize(original) }
+        assertEquals(true, outcome.isFailure)
+        assertEquals(7L, original.revision)
+        assertEquals(0L, original.lastSyncAtEpochMs)
+    }
+
+    @Test
     fun resolveCurrentExitCallsProviderOnce() {
         var calls = 0
         val synchronizer = GeoProfileSynchronizer(GeoIpProvider {
