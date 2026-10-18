@@ -28,6 +28,7 @@ data class ProbeConfig(
     val expectedLat: Double?,
     val expectedLon: Double?,
     val role: String,
+    val phase: ProbePhase,
 ) {
     val expectedCoordinates: Boolean get() = expectedLat != null && expectedLon != null
     val isTarget: Boolean get() = role == "target"
@@ -50,7 +51,8 @@ class ProbeEngine(private val context: Context, private val config: ProbeConfig)
         fingerprint: String? = null,
     ): ProbeObservation {
         val expected = when {
-            config.isTarget && config.expectedCoordinates && api in setOf("framework", "fused") ->
+            config.isTarget && config.phase == ProbePhase.active &&
+                config.expectedCoordinates && api in setOf("framework", "fused") ->
                 "TARGET_MATCH"
             !config.isTarget -> "UNCHANGED_FROM_BASELINE"
             else -> "OBSERVE_ONLY"
@@ -72,9 +74,12 @@ class ProbeEngine(private val context: Context, private val config: ProbeConfig)
         val latitude = fix.latitude
         val longitude = fix.longitude
         val fingerprint = ProbeFingerprint.location(config.sharedSecret, latitude, longitude)
-        val matched = config.isTarget && config.expectedCoordinates &&
+        val matched = config.isTarget && config.phase == ProbePhase.active &&
+            config.expectedCoordinates &&
             ProbeFingerprint.nearExpected(latitude, longitude, config.expectedLat!!, config.expectedLon!!)
-        val actual = if (matched) ProbeActual.MATCH_TARGET else if (config.isTarget && config.expectedCoordinates)
+        val actual = if (matched) ProbeActual.MATCH_TARGET else if (
+            config.isTarget && config.phase == ProbePhase.active && config.expectedCoordinates
+        )
             ProbeActual.DIFFERENT else ProbeActual.PRESENT
         return sample(api, method, actual, fingerprint)
     }
