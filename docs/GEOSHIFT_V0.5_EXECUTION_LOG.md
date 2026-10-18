@@ -161,3 +161,8 @@
 - **本次未执行/限制**：无实际 Android 17/HyperOS 设备连接、无真实 8 报告、无实机回调或权限实测；构建成功也不等于设备行为通过；不进行真实平台账号或第三方 App 测试。
 - **下一步**：运行并审核新的 GitHub Actions，修复具体测试/编译失败；成功后仅标 G08 的**可构建 Probe 与分析器代码级 DONE**，独立实机对照仍留 G09。
 - **静态复核补充**：Android 29 时标记 API30 的 `CellInfo.getCellIdentity` 未覆盖；目标 Probe 在 baseline 阶段不产生虚假 FAIL；Python 分析器 `NOT_RUN` 使用非零进程退出码 3，不能被自动化误算 PASS；使用稳定 HMAC 格式断言消除随机测试误失败。以上改动位于首轮 CI 触发后，必须以随后最终提交对应 CI 为正式证据。
+
+### Round 008 最终源码复核与 CI 追踪
+- **首轮运行**：#39099592799 由提交 `7443147a6ec91ae295e39e3b0aa953d2ed344d39` 触发；在后续代码复核时，主应用与四 Probe Flavor 的 JVM tests 已明确通过，Benchmark/Debug APK/脚本仍按最终 CI 完整核验，不混用提交证据。
+- **后续修复**：API 29 (Android 10) 对 API 30 的 `LocationManager.getCurrentLocation` 与 `CellInfo.getCellIdentity` 标记 `UNSUPPORTED`，不调用高版本原生接口；目标 baseline 不自动记为模拟目标失败；保存原生 FINE/COARSE/NONE 授权快照，权限在 baseline 与 active 两阶段变化时离线分析器拒绝比较；`NOT_RUN` 退出码为 3。移除概率性不稳定测试断言。
+- **最终代码要求**：包含上述补丁的最后提交才是正式 CI 依据。不得将四 APK 构建视为真机功能验收；G08 的真实 8 份设备报告仍 NOT RUN。
