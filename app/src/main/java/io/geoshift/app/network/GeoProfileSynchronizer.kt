@@ -1,6 +1,7 @@
 package io.geoshift.app.network
 
 import io.geoshift.app.core.GeoProfile
+import io.geoshift.app.core.GeoContextPolicy
 import java.util.Locale
 
 class GeoProfileSynchronizer(
@@ -19,7 +20,7 @@ class GeoProfileSynchronizer(
         nowEpochMs: Long = System.currentTimeMillis(),
     ): Outcome {
         val country = result.countryCode.uppercase()
-        val updated = base.copy(
+        val updated = GeoContextPolicy.changedLocation(base, base.copy(
             timezoneId = result.timezoneId.ifBlank { base.timezoneId },
             localeTag = defaultLocaleForCountry(country),
             countryCode = country,
@@ -29,7 +30,8 @@ class GeoProfileSynchronizer(
             lastSyncCity = result.city,
             lastSyncRegion = result.region,
             lastSyncAtEpochMs = nowEpochMs,
-        )
+            geoSource = "geoip",
+        ))
         return Outcome(updated, result)
     }
 
