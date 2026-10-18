@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = "GeoShift"
 include(":app")
 include(":benchmark")
+include(":probe")
