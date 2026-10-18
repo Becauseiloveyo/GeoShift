@@ -2,7 +2,7 @@
 
 > **唯一执行依据 / Single Source of Truth**
 >
-> 状态：**IN PROGRESS — G00-G04 COMPLETE; G05 NEXT**  
+> 状态：**IN PROGRESS — G05 IMPLEMENTED_UNVERIFIED; CI PENDING**  
 > 计划版本：1.0.0；建立日期：2026-10-17  
 > 仓库：`Becauseiloveyo/GeoShift`；开发分支：`feat/v0.5-privacy-reliability`  
 > 基线分支：`feat/v0.1-foundation`；基线提交：`31b14b46923c9f710936b4298e00231781c263f7`（2026-09-07）  
@@ -50,7 +50,7 @@
 | G02 | P0 | Strict Map Session 安全止损 | 显式确认 + 120s TTL + Shell stop + UID/包名隔离 + 禁用 Broker 全局适配；完整 CI #39037167354 成功；实机测试归 G09 | DONE |
 | G03 | P0 | Hook 可观测性与身份隔离 | 异步脱敏审计、诊断日志导入及状态 UI、共享 UID/多用户歧义拒绝单测；完整 CI #39038730416 通过，真机留 G08/G09 | DONE |
 | G04 | P0 | 定位 API 语义和回调稳定性 | null/空列表保真、取消与监听器注册/注销、API 33+ 异步 Geocoder；首次 CI 编译失败已修复，最终 CI #39050614646 全部成功；真机归 G08/G09 | DONE |
-| G05 | P1 | 原子地理 Profile、无线数据有效期 | VPN 地区变化时旧无线数据不得作为新地区“有效”；快照版本、来源、过期状态、同步失败回退有单测 | TODO |
+| G05 | P1 | 原子地理 Profile、无线数据有效期 | v5 原子快照、Revision CAS、GeoIP 区域更新时无线数据过期及手动确认、旧无线身份停用；新增单测，待完整 CI，真机归 G08/G09 | IMPLEMENTED_UNVERIFIED |
 | G06 | P1 | 原生隐私权限引导和诊断 UI | 精确/大致/拒绝的官方设置入口；静态配置完整度与实测保护效果分开；未测试标“未验证” | TODO |
 | G07 | P1 | 本地密钥、日志和导出卫生 | 原生 Android Keystore 保护 provider API key；迁移与异常测试；日志和 Profile JSON 不输出凭据/真实坐标 | TODO |
 | G08 | P1 | 独立自控 Probe 与对照测试 | 编写受控测试 app/automated tests，覆盖 Framework、Fused、Geocoder、Wi-Fi、Telephony；非目标应用对照；输出机器可读结果 | TODO |
