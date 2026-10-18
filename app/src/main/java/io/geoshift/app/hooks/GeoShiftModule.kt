@@ -19,6 +19,7 @@ import io.geoshift.app.core.LocationListenerRegistry
 import io.geoshift.app.core.AuditOutcome
 import io.geoshift.app.core.ProfileStoreV2
 import io.geoshift.app.core.effectiveWifiAccessPoints
+import io.geoshift.app.core.isRadioCurrent
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 import java.lang.reflect.InvocationTargetException
@@ -610,10 +611,10 @@ class GeoShiftModule : XposedModule() {
         isLocationActive() && this!!.geocoderEnabled
 
     private fun GeoProfile?.isWifiActive(): Boolean =
-        this != null && enabled && wifiEnabled
+        this != null && enabled && wifiEnabled && isRadioCurrent()
 
     private fun GeoProfile?.isTelephonyActive(): Boolean =
-        this != null && enabled && telephonyEnabled
+        this != null && enabled && telephonyEnabled && isRadioCurrent()
 
     private fun GeoProfile?.matchesCellSpec(radios: Set<String>): Boolean {
         if (!isTelephonyActive()) return false
