@@ -25,6 +25,8 @@ import io.geoshift.app.core.NativeLocationAccess
 import io.geoshift.app.core.ProfileCodec
 import io.geoshift.app.core.ProfileStoreV2
 import io.geoshift.app.core.ProviderSettings
+import io.geoshift.app.core.ProviderCredentialStatus
+import io.geoshift.app.core.CredentialWrite
 import io.geoshift.app.core.WifiAccessPointProfile
 import io.geoshift.app.network.CachingRadioEnvironmentProvider
 import io.geoshift.app.network.CompositeRadioEnvironmentProvider
@@ -54,6 +56,7 @@ class MainActivity : ComponentActivity() {
     private var vpnActive by mutableStateOf(false)
     private var profiles by mutableStateOf<List<GeoProfile>>(emptyList())
     private var providerSettings by mutableStateOf(ProviderSettings.Snapshot())
+    private var credentialStatus by mutableStateOf(ProviderCredentialStatus.EMPTY)
     private var syncStatus by mutableStateOf("")
     private var radioStatus by mutableStateOf("")
     private var auditEvents by mutableStateOf<List<HookAuditEvent>>(emptyList())
@@ -154,8 +157,7 @@ class MainActivity : ComponentActivity() {
         serviceLabel = getString(R.string.connecting_lsposed)
         syncStatus = getString(R.string.no_sync_yet)
         radioStatus = getString(R.string.radio_not_configured)
-        providerSettings = ProviderSettings.load(this)
-        updateProviderStatus()
+        reloadProviderCredentials()
 
         Thread {
             val apps = loadLaunchableApps()
@@ -172,6 +174,7 @@ class MainActivity : ComponentActivity() {
                         vpnActive = vpnActive,
                         profiles = profiles,
                         providerSettings = providerSettings,
+                        credentialStatus = credentialStatus,
                         syncStatus = if (serviceConnected) "$serviceLabel · $syncStatus" else serviceLabel,
                         radioStatus = radioStatus,
                         notice = notice,
@@ -201,6 +204,7 @@ class MainActivity : ComponentActivity() {
                         importAudit = { auditLauncher.launch(arrayOf("text/plain", "text/*", "application/octet-stream")) },
                         openNativePermissions = ::openNativePermissions,
                         saveProviders = ::saveProviderSettings,
+                        resetProviderCredentials = ::resetProviderCredentials,
                         previewRadio = ::previewRadioEnvironment,
                         applyRadioSuggestion = ::applyRadioSuggestion,
                         clearNotice = { notice = null },
@@ -403,10 +407,36 @@ class MainActivity : ComponentActivity() {
         if (settings.wigleTokenName.isBlank() != settings.wigleToken.isBlank()) {
             return toast(getString(R.string.enter_wigle_both))
         }
-        ProviderSettings.save(this, settings)
-        providerSettings = ProviderSettings.load(this)
+        when (ProviderSettings.save(this, settings)) {
+            CredentialWrite.SAVED -> {
+                reloadProviderCredentials()
+                showNotice(getString(R.string.provider_settings_saved))
+            }
+            CredentialWrite.RECOVERY_REQUIRED ->
+                showNotice("Encrypted credentials cannot be decrypted. Use the explicit reset action.")
+            CredentialWrite.FAILED ->
+                showNotice("Secure credential save failed; no plaintext fallback was written.")
+        }
+    }
+
+    private fun reloadProviderCredentials() {
+        val state = ProviderSettings.loadWithStatus(this)
+        providerSettings = state.snapshot
+        credentialStatus = state.status
         updateProviderStatus()
-        showNotice(getString(R.string.provider_settings_saved))
+    }
+
+    private fun resetProviderCredentials() {
+        if (credentialStatus != ProviderCredentialStatus.RECOVERY_REQUIRED &&
+            credentialStatus != ProviderCredentialStatus.MIGRATION_FAILED &&
+            credentialStatus != ProviderCredentialStatus.CLEANUP_FAILED) {
+            return
+        }
+        val cleared = ProviderSettings.resetAfterUserConfirmation(this)
+        reloadProviderCredentials()
+        showNotice(if (cleared)
+            "Provider credentials cleared. Re-enter them; no old token can be recovered."
+        else "Could not fully reset secure credentials. Review storage / Keystore state.")
     }
 
     private fun updateProviderStatus() {
