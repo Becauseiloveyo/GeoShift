@@ -160,3 +160,4 @@
 - **文档**：`docs/G08_OWNED_PROBE_PROTOCOL.md` 说明 8 份报告生成、脚本命令、限制及 G09 需要完成的真机矩阵。Google Fused 依赖 `com.google.android.gms:play-services-location:21.4.0`（Google 2026-06-25 发布）。
 - **本次未执行/限制**：无实际 Android 17/HyperOS 设备连接、无真实 8 报告、无实机回调或权限实测；构建成功也不等于设备行为通过；不进行真实平台账号或第三方 App 测试。
 - **下一步**：运行并审核新的 GitHub Actions，修复具体测试/编译失败；成功后仅标 G08 的**可构建 Probe 与分析器代码级 DONE**，独立实机对照仍留 G09。
+- **静态复核补充**：Android 29 时标记 API30 的 `CellInfo.getCellIdentity` 未覆盖；目标 Probe 在 baseline 阶段不产生虚假 FAIL；Python 分析器 `NOT_RUN` 使用非零进程退出码 3，不能被自动化误算 PASS；使用稳定 HMAC 格式断言消除随机测试误失败。以上改动位于首轮 CI 触发后，必须以随后最终提交对应 CI 为正式证据。
