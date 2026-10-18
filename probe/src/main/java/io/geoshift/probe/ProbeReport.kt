@@ -35,6 +35,7 @@ data class ProbeReport(
     val model: String,
     val appVersion: String,
     val sourceRevision: String,
+    val locationGrant: String,
     val recordedAtUtc: String,
     val observations: List<ProbeObservation>,
 ) {
@@ -42,6 +43,7 @@ data class ProbeReport(
         require(session.matches(Regex("[A-Za-z0-9_-]{6,32}")))
         require(role in setOf("target", "control1", "control2", "control3"))
         require(packageName == "io.geoshift.probe.$role")
+        require(locationGrant in setOf("FINE", "COARSE", "NONE"))
         require(recordedAtUtc.isNotBlank())
     }
 }
@@ -72,6 +74,7 @@ object ProbeReportCodec {
             put("model", report.model)
             put("probeVersion", report.appVersion)
             put("geoshiftSourceRevision", report.sourceRevision)
+            put("locationGrant", report.locationGrant)
             put("collectedAtUtc", report.recordedAtUtc)
             put("method", "user-initiated-owned-device")
             put("redacted", true)
