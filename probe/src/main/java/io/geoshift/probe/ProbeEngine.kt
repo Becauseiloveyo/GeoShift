@@ -275,6 +275,8 @@ class ProbeEngine(private val context: Context, private val config: ProbeConfig)
     }
 
     private fun telephonyCells() = guarded("telephony", "getAllCellInfo") {
+        if (Build.VERSION.SDK_INT < 30)
+            return@guarded sample("telephony", "getAllCellInfo", ProbeActual.UNSUPPORTED)
         val manager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         val cells = manager.allCellInfo.orEmpty()
         if (cells.isEmpty()) sample("telephony", "getAllCellInfo", ProbeActual.ABSENT)
