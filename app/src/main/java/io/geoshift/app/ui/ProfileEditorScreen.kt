@@ -52,6 +52,7 @@ import io.geoshift.app.R
 import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.ProfileDiagnostics
 import io.geoshift.app.core.ProfileHealth
+import io.geoshift.app.core.confirmRadioForCurrentGeography
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collect
 
@@ -318,6 +319,19 @@ internal fun ProfileEditorScreen(
                 }
                 item {
                     SectionCard(title = stringResource(R.string.section_radio_identity), iconRes = R.drawable.ms_wifi_24) {
+                        if (draft.radioStale && (draft.wifiEnabled || draft.telephonyEnabled)) {
+                            Text(
+                                "Saved Wi-Fi / cell data belongs to an older location. " +
+                                    "Overrides are suspended until you confirm or refresh the data.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            OutlinedButton(
+                                onClick = {
+                                    draft = draft.confirmRadioForCurrentGeography("manual confirmation")
+                                },
+                            ) { Text("Confirm radio matches current location") }
+                        }
                         SwitchSetting(
                             stringResource(R.string.wifi_identity),
                             stringResource(R.string.wifi_identity_desc),
