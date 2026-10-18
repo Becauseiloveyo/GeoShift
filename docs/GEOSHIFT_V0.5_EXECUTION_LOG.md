@@ -186,3 +186,11 @@
 - **文档**：`docs/G09_ANDROID17_HYPEROS_DEVICE_ACCEPTANCE.md` 明确如何下载相同 CI 的两份 APK Artifact、校验哈希、手动安装、申请权限、保证只有唯一 Target 在 Scope、执行四应用对照、采集至少六份定时目标 Probe JSON、生成设备审查报告、手动清理；`docs/G09_DEVICE_MATRIX_TEMPLATE.json` 的 16 项状态初始均为 NOT_RUN。
 - **安全**：严格模式不自动启用；不提供账号风控绕过；不要求上传原始 GPS、SSID/BSSID、CellID、密钥、设备序列号或完整 logcat；设备状态只读，APK 安装命令仅在文档中由用户明确执行。
 - **状态**：**G09 = BLOCKED（真机运行 NOT RUN）**，不是 DONE；**G10 仍 TODO** 且正式发布不可放行。离线代码级 CI 运行结果应在后续补录，CI 成功也不解除缺设备阻塞。
+
+### Round 009 G09 离线验收工具最终 CI · PASS / 真机 BLOCKED
+- **最终受测源码提交**：`7f513560091ef4d416ec00d0319e357415f99478`。包含 G09 只读 ADB 预检、四 Probe SHA256 生成及校验、16 项验收矩阵及文档、8 份对照报告与 6+ 份跨 30 分钟独立 target-active 样本审查；强制拒绝 SDK/设备型号/权限状态漂移、缺失、签名来源不受信任或测试不足情况下的虚假完成。
+- **完整 CI 结果**：[GitHub Actions #39107144292](https://github.com/Becauseiloveyo/GeoShift/actions/runs/39107144292)，job `117615370808`，`completed / success`。
+- **真实通过步骤**：主 App JVM tests `gradle :app:testDebugUnitTest --stacktrace` → BUILD SUCCESSFUL in 1m29s；四 Probe Flavor JVM tests → BUILD SUCCESSFUL in 17s；Macrobenchmark **编译** → BUILD SUCCESSFUL in 1m25s；`gradle :app:assembleDebug :probe:assembleDebug --stacktrace` → BUILD SUCCESSFUL in 29s；`tools/g09_device_gate.py manifest` 和 `verify-manifest` → `CHECKSUM_MATCH`，`verifiedArtifactCount: 4`；主 App、四 Probe APK Artifact 上传成功；`python3 -m unittest discover -s tools/tests -v` → **Ran 30 tests，OK**（包含本轮 `test_g09_device_gate`）。
+- **构建产物**：`GeoShift-Probe-four-variants-7f513560091ef4d416ec00d0319e357415f99478`，artifact ID `12128587964`，归档大小 `9,453,441 bytes`，包含四个变体的 APK 与 SHA256 manifest；`GeoShift-debug-7f513560091ef4d416ec00d0319e357415f99478`，artifact ID `12128124224`，归档大小 `10,648,405 bytes`。
+- **设备可用性事实**：运行时 `adb` 命令不存在，USB 设备总线不可访问；没有 Android 17／HyperOS 设备连接，**没有安装/启动 APK、切换权限/LSPosed Scope、采集真实 JSON、运行 30 分钟或验证 Keystore 迁移**。G09 实机门槛仍 **BLOCKED / NOT RUN**，严格禁止记录为 DONE。任何报告中 `USER_REPORTED_COMPLETE_REQUIRES_INDEPENDENT_REVIEW` 不是平台证明或 G09 自动 PASS。
+- **任务结论**：G09 验收工具已实现并通过 CI，但 G09 正式状态仍为 **BLOCKED**；G10 Release 仍为 TODO/发布门槛未达标。下一步由设备所有者在授权 Android 17／HyperOS 手机上按照 `docs/G09_ANDROID17_HYPEROS_DEVICE_ACCEPTANCE.md` 验证、导出 8 份对照报告和至少 6 份跨 30 分钟目标报告，并复核人工检查证据；通过之前不开始 Stable Release。
