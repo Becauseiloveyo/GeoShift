@@ -121,3 +121,12 @@
 - **隐私边界**：PackageManager 数据不证明 AppOps、后台授权、系统定位开关、实际 API 值或网络侧地理信息；手动导入的 LSPosed/logcat 日志可以伪造。真实 Android 17/HyperOS 上的系统跳转与权限切换 **NOT RUN**（留 G08/G09）。
 - **文档**：`docs/G06_NATIVE_PERMISSIONS_AND_EVIDENCE.md`。
 - **下一步**：检查新的 G06 CI（unit tests、benchmark compile、debug build、upload）。失败要记录原因并修复；通过后把 G06 标记为 DONE（代码级），继续 G07 Keystore 密钥处理。
+
+### Round 006 最终验收 · G06 CI PASS
+- **受测完整提交**：`f56f6fd330e45d00e2248b55b66eac91c86e7380`，包括 G06 的所有 UI/权限读取、证据模型、JVM 测试及文档修改。
+- **CI 来源**：[GitHub Actions #39093873195](https://github.com/Becauseiloveyo/GeoShift/actions/runs/39093873195)，job `117576119210`，`completed / success`。
+- **真实通过项目**：`gradle :app:testDebugUnitTest --stacktrace` → BUILD SUCCESSFUL in 1m51s；`gradle :app:assembleBenchmark :benchmark:assembleBenchmark --stacktrace` → BUILD SUCCESSFUL in 1m59s（只是编译，不是实测性能）；`gradle :app:assembleDebug --stacktrace` → BUILD SUCCESSFUL in 32s；上传 Debug APK 成功。
+- **构建产物**：`GeoShift-debug-f56f6fd330e45d00e2248b55b66eac91c86e7380`，GitHub Actions artifact ID `12123517510`，压缩产物大小 `10,631,456 bytes`。这不代表独立 APK 内部大小、签名认证或设备安装结果。
+- **完成状态**：**G06 = DONE（代码级 CI 门槛）**。自动化测试覆盖权限分类、未知结果保留、配置 100 分不等于 Probe PASS、历史 Hook 证据不得升级为实际结果；精确用例总数未独立核对，不虚构。
+- **设备验证仍 NOT RUN**：目标包可见性及 PackageManager 返回值、Android 17/HyperOS 应用设置跳转与权限切换、AppOps/后台授权、权限降级后的应用进程重启、LSPosed 与 API 返回值。均归 G08/G09。
+- **下一任务**：G07 Android Keystore 本地 provider API key 保护、迁移/损坏回退、默认日志与导出脱敏；继续遵守不扩展 VPN/代理与风控绕过的约束。
