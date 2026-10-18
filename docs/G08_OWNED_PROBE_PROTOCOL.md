@@ -42,7 +42,7 @@
      control2-baseline.json control2-active.json \
      control3-baseline.json control3-active.json
    ```
-8. 把 `probe-comparison.json` 纳入设备验收报告。**PASS 只代表这 8 份非可信报告记录的局部可比 API 满足条件，不代表 Android 17/HyperOS 已通过全量隐私安全测试或 30 分钟持续定位稳定性。**
+8. 命令退出码：0 = 仅测得的受控路径 PASS；1 = 发现可比 FAIL；2 = 输入缺失/格式无效；3 = NOT_RUN（证据不足，不能把它当成功）。将 `probe-comparison.json` 纳入设备验收报告。**PASS 只代表这 8 份非可信报告记录的局部可比 API 满足条件，不代表 Android 17/HyperOS 已通过全量隐私安全测试或 30 分钟持续定位稳定性。**
 
 ### 对照脚本判定
 
@@ -58,5 +58,6 @@
 CI 新增：`:probe:testTargetDebugUnitTest`、`:probe:testControl1DebugUnitTest`、`:probe:testControl2DebugUnitTest`、`:probe:testControl3DebugUnitTest`；`:probe:assembleDebug` 产出四 APK；`python3 -m unittest discover -s tools/tests -v` 运行离线分析器单元测试。保留 GeoShift 原 App 既有 JVM 测试、Benchmark 编译与主 Debug APK 构建。
 
 - **CI 代码/构建结果**：等待本轮 GitHub Actions 实际返回。无设备接入、尚未获取 8 份真实设备测量报告，所有真正的 G08 设备 API 隔离测试 = **NOT RUN**。
+- Android 10 / API 29 对尚不可调用的 `CellInfo.getCellIdentity` 接口标为 UNSUPPORTED，不尝试访问高版本 API。
 - G09 仍需在 Android 17/HyperOS 上实际安装全部四个变体，验证 SDK/LSPosed/GMS/权限、持续 30 分钟位置更新、停止/重启/取消和 3 个对照，并检查报告与 APK/源码 SHA 对应。
 - 没有新的 VPN、代理、账号限制绕过或系统级 Hook；仅用于用户自己拥有并授权测试的设备、测试 App。
