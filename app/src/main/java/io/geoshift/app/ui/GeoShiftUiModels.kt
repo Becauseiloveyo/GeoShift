@@ -2,6 +2,7 @@ package io.geoshift.app.ui
 
 import io.geoshift.app.core.GeoProfile
 import io.geoshift.app.core.HookAuditEvent
+import io.geoshift.app.core.NativeLocationAccess
 import io.geoshift.app.core.ProviderSettings
 
 enum class Destination { Overview, Profiles, Providers, Diagnostics }
@@ -20,6 +21,7 @@ data class GeoShiftUiState(
     val notice: String? = null,
     val auditEvents: List<HookAuditEvent> = emptyList(),
     val auditLogStatus: String = "No diagnostic evidence imported",
+    val nativePermissions: Map<String, NativeLocationAccess> = emptyMap(),
     val isSyncing: Boolean = false,
     val isRadioBusy: Boolean = false,
     val editingProfile: GeoProfile? = null,
@@ -40,6 +42,7 @@ data class GeoShiftActions(
     val exportProfile: (GeoProfile) -> Unit,
     val importProfile: () -> Unit,
     val importAudit: () -> Unit,
+    val openNativePermissions: (String) -> Unit,
     val saveProviders: (ProviderSettings.Snapshot) -> Unit,
     val previewRadio: () -> Unit,
     val applyRadioSuggestion: () -> Unit,
