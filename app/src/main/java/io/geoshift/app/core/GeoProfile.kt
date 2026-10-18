@@ -33,6 +33,15 @@ data class GeoProfile(
     val lastSyncCity: String = "",
     val lastSyncRegion: String = "",
     val lastSyncAtEpochMs: Long = 0L,
+    /** Monotonic per-profile commit revision; set by ProfileStoreV2. */
+    val revision: Long = 0L,
+    /** Changes whenever country/city/region or coordinates materially change. */
+    val geoRevision: Long = 0L,
+    /** The geography revision to which wireless metadata was last confirmed. */
+    val radioGeoRevision: Long = 0L,
+    /** Keep older radio values for recovery but prohibit their use in hooks. */
+    val radioStale: Boolean = false,
+    val geoSource: String = "",
 ) {
     fun validate(): List<String> = buildList {
         if (targetPackage.isBlank()) add("Target package is required")
@@ -75,6 +84,10 @@ data class GeoProfile(
         if (telephonyEnabled && cellAreaCode < -1L) add("Cell area code cannot be below -1")
         if (telephonyEnabled && cellId < -1L) add("Cell ID cannot be below -1")
         if (lastSyncAtEpochMs < 0L) add("Last sync timestamp cannot be negative")
+        if (revision < 0L || geoRevision < 0L || radioGeoRevision < 0L) {
+            add("Profile revisions cannot be negative")
+        }
+        if (radioGeoRevision > geoRevision) add("Radio revision cannot exceed geography revision")
     }
 
     companion object {
